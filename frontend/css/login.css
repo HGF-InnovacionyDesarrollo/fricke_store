@@ -1,20 +1,32 @@
 body.login { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px 16px 0; background: var(--superficie); }
 .tarjeta-login {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: min(1040px, 100%);
-  background: var(--tarjeta); border-radius: 28px; padding: 36px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px; width: min(960px, 100%);
+  background: var(--tarjeta); border-radius: 28px; padding: 40px 40px 32px;
 }
-.logo-chico { font-size: 34px; margin-bottom: 26px; }
-.lado-izq h1 { font-size: 36px; font-weight: 400; margin: 0 0 14px; line-height: 1.2; }
-.sub { font-size: 16px; color: var(--texto-2); margin: 0; }
-.lado-der { padding-top: 64px; }
+.lado-izq { display: flex; flex-direction: column; }
+.logo-chico { font-size: 30px; margin-bottom: 28px; }
+.lado-izq h1 { font-size: 36px; font-weight: 400; margin: 0 0 12px; line-height: 1.2; }
+.sub { font-size: 16px; color: var(--texto-2); margin: 0; line-height: 1.5; }
+.sub b { font-weight: 500; color: var(--texto); }
+
+/* crédito de la unidad: discreto, abajo a la izquierda */
+.credito {
+  margin-top: auto; padding-top: 32px; display: flex; align-items: center; gap: 14px;
+  font-size: 12px; line-height: 1.4; color: var(--texto-3);
+}
+.credito .logo-innova { width: 56px; flex: none; }
+.credito b { font-weight: 500; color: var(--texto-2); }
+
+.lado-der { padding-top: 58px; }
 .lado-der .campo label { background: var(--tarjeta); }
 .lado-der .check { margin: -4px 0 8px; }
 .lado-der .zona-error { min-height: 4px; margin-bottom: 8px; }
 .lado-der .error-txt { font-size: 14px; }
-.nota { font-size: 13px; color: var(--texto-2); margin: 16px 0 32px; }
+.nota { font-size: 13px; color: var(--texto-3); margin: 16px 0 28px; }
 .acciones { display: flex; justify-content: flex-end; gap: 8px; align-items: center; flex-wrap: wrap; }
 #aviso-expirada { margin-bottom: 20px; }
-.pie-login { display: flex; justify-content: space-between; width: min(1040px, 100%); padding: 12px 10px 24px; font-size: 12px; color: var(--texto-2); }
+.pie-login { display: flex; justify-content: space-between; align-items: center; width: min(960px, 100%); padding: 10px 4px 24px; font-size: 12px; color: var(--texto-2); }
+.pie-login > span { padding: 6px 10px; }
 .pie-login nav { display: flex; gap: 6px; }
 .pie-login a { color: var(--texto-2); padding: 6px 10px; border-radius: 4px; }
 .pie-login a:hover { background: var(--hover); text-decoration: none; }
@@ -24,6 +36,9 @@ body.login { display: flex; flex-direction: column; align-items: center; justify
   .tarjeta-login { grid-template-columns: 1fr; padding: 24px 8px; gap: 8px; }
   .lado-izq h1 { font-size: 28px; }
   .lado-der { padding-top: 16px; }
+  .credito { order: 1; padding-top: 8px; }
+  .tarjeta-login { display: flex; flex-direction: column; }
+  .lado-der { order: 0; }
+  .lado-izq { display: contents; }
+  .logo-chico, .lado-izq h1, .sub { order: -1; }
 }
-.lado-izq .logo-innova { width: 180px; margin-top: 40px; }
-@media (max-width: 760px) { .lado-izq .logo-innova { display: none; } }
