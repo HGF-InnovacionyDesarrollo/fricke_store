@@ -11,3 +11,5 @@
 .indice a { font-size: 13px; padding: 6px 12px; border-radius: 16px; background: var(--superficie); color: var(--texto); }
 .indice a:hover { background: var(--primario-suave); text-decoration: none; }
 .doc-firma { width: 150px; margin: 56px auto 0; }
+.cumplimiento { margin-top: 32px; border: 1px solid var(--borde); border-radius: 12px; padding: 12px 18px; font-size: 14px; }
+.cumplimiento summary { cursor: pointer; font-weight: 500; }

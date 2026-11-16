@@ -115,6 +115,36 @@ CREATE TABLE IF NOT EXISTS modulos_usuario (
     PRIMARY KEY (modulo_id, usuario_id)
 );
 
+-- Ajustes del sistema (contención, último respaldo, ancla de la bitácora, etc.)
+CREATE TABLE IF NOT EXISTS ajustes (
+    clave TEXT PRIMARY KEY,
+    valor TEXT,
+    actualizado TEXT
+);
+
+-- Registro de incidentes de seguridad y vulneraciones de datos (Ley 21.663 y Ley 21.719 art. 14 sexies)
+CREATE TABLE IF NOT EXISTS incidentes (
+    id INTEGER PRIMARY KEY,
+    titulo TEXT NOT NULL,
+    descripcion TEXT,
+    detectado_en TEXT NOT NULL,          -- UTC: desde aquí corren los plazos
+    registrado_por INTEGER REFERENCES usuarios(id),
+    registrado_en TEXT NOT NULL,
+    severidad TEXT NOT NULL DEFAULT 'media',   -- baja | media | alta | critica
+    afecta_servicio_esencial INTEGER NOT NULL DEFAULT 0,
+    afecta_datos_personales INTEGER NOT NULL DEFAULT 0,
+    afecta_datos_sensibles INTEGER NOT NULL DEFAULT 0,
+    estado TEXT NOT NULL DEFAULT 'abierto',   -- abierto | contenido | cerrado
+    alerta_anci_en TEXT,
+    actualizacion_anci_en TEXT,
+    informe_final_en TEXT,
+    plan_accion_en TEXT,
+    agencia_notificada_en TEXT,
+    titulares_notificados_en TEXT,
+    cerrado_en TEXT,
+    notas TEXT
+);
+
 -- Bitácora: cada fila incluye el hash de la anterior. Si alguien edita o borra una fila,
 -- la cadena se rompe y `verificar_auditoria()` lo detecta.
 CREATE TABLE IF NOT EXISTS auditoria (
@@ -156,9 +186,39 @@ def bd():
         c.close()
 
 
+# Columnas agregadas después de la primera versión (migración simple e idempotente)
+MIGRACIONES = {
+    "solicitudes_derechos": {
+        "acuse_en": "TEXT",
+        "prorrogada": "INTEGER NOT NULL DEFAULT 0",
+        "prorroga_motivo": "TEXT",
+        "respondida_en": "TEXT",
+        "respuesta_hash": "TEXT",
+    },
+}
+
+
 def inicializar():
     with bd() as c:
         c.executescript(ESQUEMA)
+        for tabla, columnas in MIGRACIONES.items():
+            existentes = {r["name"] for r in c.execute(f"PRAGMA table_info({tabla})")}
+            for col, tipo in columnas.items():
+                if col not in existentes:
+                    c.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
+
+
+def leer_ajuste(clave: str, defecto=None):
+    with bd() as c:
+        f = c.execute("SELECT valor FROM ajustes WHERE clave=?", (clave,)).fetchone()
+    return f["valor"] if f else defecto
+
+
+def guardar_ajuste(clave: str, valor):
+    with bd() as c:
+        c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES (?,?,?) "
+                  "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
+                  (clave, None if valor is None else str(valor), ahora()))
 
 
 def _hash_fila(anterior: str, ts: str, usuario_id, accion: str, detalle, ip) -> str:
@@ -169,18 +229,43 @@ def _hash_fila(anterior: str, ts: str, usuario_id, accion: str, detalle, ip) -> 
 def auditar(accion: str, usuario_id: int | None = None, detalle: str | None = None, ip: str | None = None):
     with _lock_auditoria, bd() as c:
         fila = c.execute("SELECT hash FROM auditoria ORDER BY id DESC LIMIT 1").fetchone()
-        anterior = fila["hash"] if fila else GENESIS
+        nuevo_id = None
+        if fila:
+            anterior = fila["hash"]
+        else:
+            # Tabla vacía (inicio o tras archivar todo): continúa desde el ancla y sin reutilizar números.
+            a = {r["clave"]: r["valor"] for r in c.execute(
+                "SELECT clave, valor FROM ajustes WHERE clave IN ('ancla_auditoria','ultimo_id_archivado')")}
+            anterior = a.get("ancla_auditoria") or GENESIS
+            nuevo_id = int(a.get("ultimo_id_archivado") or 0) + 1
         ts = ahora()
         h = _hash_fila(anterior, ts, usuario_id, accion, detalle, ip)
         c.execute(
-            "INSERT INTO auditoria (ts, usuario_id, accion, detalle, ip, hash_anterior, hash) VALUES (?,?,?,?,?,?,?)",
-            (ts, usuario_id, accion, detalle, ip, anterior, h),
+            "INSERT INTO auditoria (id, ts, usuario_id, accion, detalle, ip, hash_anterior, hash) VALUES (?,?,?,?,?,?,?,?)",
+            (nuevo_id, ts, usuario_id, accion, detalle, ip, anterior, h),
         )
+        _espejo_siem(ts, usuario_id, accion, detalle, ip, h)
+
+
+def _espejo_siem(ts, usuario_id, accion, detalle, ip, h):
+    """Copia cada evento como una línea JSON para que un SIEM (Wazuh, Graylog) la recoja."""
+    from config import LOG_SIEM
+    if not LOG_SIEM:
+        return
+    try:
+        LOG_SIEM.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_SIEM, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"ts": ts, "app": "fricke-store", "usuario_id": usuario_id, "accion": accion,
+                                 "detalle": detalle, "ip": ip, "hash": h}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass  # el espejo nunca debe impedir registrar en la bitácora principal
 
 
 def verificar_auditoria() -> dict:
+    # Si se archivaron registros antiguos, la cadena continúa desde el ancla guardada.
+    ancla = leer_ajuste("ancla_auditoria", GENESIS)
     with bd() as c:
-        anterior = GENESIS
+        anterior = ancla
         n = 0
         for f in c.execute("SELECT * FROM auditoria ORDER BY id"):
             n += 1
@@ -189,3 +274,29 @@ def verificar_auditoria() -> dict:
                 return {"integra": False, "registros": n, "falla_en_id": f["id"]}
             anterior = f["hash"]
         return {"integra": True, "registros": n, "ultimo_hash": anterior}
+
+
+def archivar_auditoria(dias: int, carpeta) -> dict:
+    """Mueve a un archivo sellado los registros más antiguos que `dias`, sin romper la cadena:
+    el hash del último registro archivado queda como ancla para verificar lo que sigue."""
+    from datetime import timedelta
+    from pathlib import Path
+    limite = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat(timespec="seconds")
+    carpeta = Path(carpeta)
+    carpeta.mkdir(parents=True, exist_ok=True)
+    with _lock_auditoria, bd() as c:
+        filas = c.execute("SELECT * FROM auditoria WHERE ts < ? ORDER BY id", (limite,)).fetchall()
+        if not filas:
+            return {"archivados": 0}
+        archivo = carpeta / f"bitacora-hasta-{filas[-1]['ts'][:10]}-id{filas[-1]['id']}.jsonl"
+        with open(archivo, "w", encoding="utf-8") as fh:
+            for f in filas:
+                fh.write(json.dumps(dict(f), ensure_ascii=False) + "\n")
+        sello = hashlib.sha256(archivo.read_bytes()).hexdigest()
+        c.execute("DELETE FROM auditoria WHERE id <= ?", (filas[-1]["id"],))
+        c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('ancla_auditoria', ?, ?)",
+                  (filas[-1]["hash"], ahora()))
+        c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('ultimo_id_archivado', ?, ?)",
+                  (str(filas[-1]["id"]), ahora()))
+    auditar("bitacora_archivada", None, f"{len(filas)} registros en {archivo.name} sha256 {sello}")
+    return {"archivados": len(filas), "archivo": str(archivo), "sha256": sello}

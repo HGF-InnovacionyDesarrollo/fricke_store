@@ -85,7 +85,13 @@ const ESTADOS = { recibida: "Recibida", en_revision: "En revisión", respondida:
         { texto: "Enviar solicitud", alHacer: async (v) => {
             try {
               const r = await api("/api/cuenta/solicitudes", { metodo: "POST", datos: { tipo: v.querySelector("#sol-tipo").value, detalle: v.querySelector("#sol-detalle").value } });
-              toast(`Solicitud #${r.id} enviada. Plazo de respuesta: ${fechaLocal(r.vence, false)}.`, 6000);
+              setTimeout(() => dialogo({
+                titulo: "Acuse de recibo",
+                html: `<div class="aviso-suave">${icono("escudo")}<span>Recibimos tu solicitud <b>#${r.id}</b> el ${esc(fechaLocal(r.acuse_en))}.<br>
+                  Está dirigida a ${esc(r.dirigida_a)}. Plazo de respuesta: <b>${esc(r.plazo)}</b>, a más tardar el <b>${esc(fechaLocal(r.vence, false))}</b>.</span></div>
+                  <p style="font-size:13px;color:var(--texto-2);margin:14px 0 0">Si no recibes respuesta en el plazo, o no estás conforme, puedes reclamar ante la Agencia de Protección de Datos Personales.</p>`,
+                acciones: [{ texto: "Entendido" }],
+              }), 50);
               cargarSolicitudes(); return true;
             } catch (e) { mostrarErrorEn(v.querySelector(".zona-error"), e.message); return false; }
           } },
@@ -98,7 +104,7 @@ const ESTADOS = { recibida: "Recibida", en_revision: "En revisión", respondida:
     const c = document.getElementById("solicitudes");
     c.innerHTML = lista.map((s) => `
       <div class="fila"><span data-icono="documento"></span>
-        <span>#${s.id} · ${esc(s.tipo_nombre)}<small>Enviada ${esc(fechaLocal(s.creada))} · responder antes del ${esc(fechaLocal(s.vence, false))}${s.respuesta ? "<br>Respuesta: " + esc(s.respuesta) : ""}</small></span>
+        <span>#${s.id} · ${esc(s.tipo_nombre)}<small>Acuse de recibo ${esc(fechaLocal(s.acuse_en || s.creada))} · ${s.respondida_en ? "respondida " + esc(fechaLocal(s.respondida_en)) : "plazo hasta el " + esc(fechaLocal(s.vence, false))}${s.prorrogada ? "<br>Plazo prorrogado: " + esc(s.prorroga_motivo || "") : ""}${s.respuesta ? '<br><span style="white-space:pre-wrap">Respuesta: ' + esc(s.respuesta) + "</span>" : ""}</small></span>
         <span class="etiqueta">${esc(ESTADOS[s.estado] || s.estado)}</span>
       </div>`).join("");
     pintarIconos(c);

@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import config as cfg
+from plazos import sumar_corridos, sumar_habiles
 from db import ahora, auditar, bd, inicializar, verificar_auditoria
 from seguridad import (HASH_SEÑUELO, enmascarar_rut, formatear_rut, hash_clave, hash_token,
                        normalizar_rut, nuevo_token, problemas_clave, verificar_clave)
@@ -45,6 +46,8 @@ async def cabeceras(request: Request, call_next):
         "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
         "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
     )
+    if request.url.scheme == "https":
+        r.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith("/api/"):
         r.headers["Cache-Control"] = "no-store"
     elif request.url.path.startswith("/static/"):
@@ -112,8 +115,8 @@ def _acepto_aviso(uid: int) -> bool:
                          (uid, cfg.VERSION_AVISO)).fetchone() is not None
 
 
-def _poner_cookie(resp: Response, token: str):
-    resp.set_cookie(cfg.COOKIE_NOMBRE, token, httponly=True, secure=cfg.COOKIE_SEGURA,
+def _poner_cookie(resp: Response, token: str, segura: bool = False):
+    resp.set_cookie(cfg.COOKIE_NOMBRE, token, httponly=True, secure=cfg.COOKIE_SEGURA or segura,
                     samesite="strict", max_age=cfg.SESION_MAXIMA_HORAS * 3600, path="/")
 
 
@@ -163,7 +166,7 @@ def login(datos: Login, request: Request, response: Response):
         )
         c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=NULL WHERE id=?", (u["id"],))
     auditar("login", u["id"], None, ip)
-    _poner_cookie(response, token)
+    _poner_cookie(response, token, segura=request.url.scheme == "https")
     return {"ok": True}
 
 
@@ -229,6 +232,17 @@ def cambiar_clave(datos: CambioClave, ctx: Contexto = Depends(sesion)):
 
 
 # ------------------------------------------------------------------ portal
+@app.get("/api/salud")
+def salud():
+    """Para monitores de disponibilidad (Uptime Kuma, Zabbix): no expone datos."""
+    try:
+        with bd() as c:
+            c.execute("SELECT 1").fetchone()
+        return {"estado": "ok", "ts": ahora()}
+    except Exception:
+        return JSONResponse({"estado": "error"}, status_code=503)
+
+
 @app.get("/api/config")
 def configuracion_publica():
     return {
@@ -238,6 +252,8 @@ def configuracion_publica():
         "correo_dpd": cfg.CORREO_DPD,
         "version_aviso": cfg.VERSION_AVISO,
         "inactividad_min": cfg.SESION_INACTIVIDAD_MIN,
+        "jefe_servicio": cfg.JEFE_SERVICIO,
+        "clave_largo_min": cfg.CLAVE_LARGO_MIN,
     }
 
 
@@ -266,7 +282,7 @@ def yo(request: Request):
         "debe_aceptar_aviso": not _acepto_aviso(ctx.u["id"]),
         "inactividad_min": cfg.SESION_INACTIVIDAD_MIN,
         "rol_nombre": cfg.ROLES.get(ctx.u["rol"], ctx.u["rol"]),
-        "puede_administrar": ctx.u["rol"] in ("admin", "dpd"),
+        "puede_administrar": ctx.u["rol"] in ("admin", "dpd", "seguridad"),
     }
 
 
@@ -338,6 +354,20 @@ ETIQUETAS_ACCION = {
     "solicitud_derecho_rechazada": "Solicitud de derechos rechazada",
     "modulo_guardado": "Módulo guardado",
     "auditoria_consultada": "Bitácora consultada",
+    "solicitud_derecho_prorrogada": "Solicitud de derechos prorrogada",
+    "incidente_registrado": "Incidente de seguridad registrado",
+    "incidente_actualizado": "Incidente de seguridad actualizado",
+    "contencion_cerrar_sesiones": "Contención: todas las sesiones cerradas",
+    "contencion_forzar_cambio_privilegiadas": "Contención: cambio de clave forzado a cuentas privilegiadas",
+    "contencion_suspender_modulos": "Contención: módulos suspendidos",
+    "contencion_reanudar_modulos": "Contención: módulos reanudados",
+    "contencion_pausar_formularios": "Contención: formularios públicos pausados",
+    "contencion_reanudar_formularios": "Contención: formularios públicos reanudados",
+    "contencion_rechazada": "Contención rechazada (contraseña incorrecta)",
+    "respaldo_realizado": "Respaldo realizado",
+    "respaldo_probado": "Restauración de respaldo probada",
+    "respaldo_fallido": "Respaldo o prueba fallida",
+    "bitacora_archivada": "Bitácora antigua archivada",
 }
 
 
@@ -400,18 +430,25 @@ class Solicitud(BaseModel):
 def nueva_solicitud(s: Solicitud, ctx: Contexto = Depends(sesion_lista)):
     if s.tipo not in TIPOS_SOLICITUD:
         raise HTTPException(400, "Tipo de solicitud no válido.")
-    vence = (datetime.now(timezone.utc) + timedelta(days=cfg.PLAZO_SOLICITUD_DIAS)).date().isoformat()
+    if s.tipo != "acceso" and len(s.detalle.strip()) < 5:
+        raise HTTPException(400, "Cuéntanos qué datos o tratamiento afecta tu solicitud.")
+    hoy = datetime.now(timezone.utc).date()
+    # Ley 21.719 art. 11: 30 días corridos; el bloqueo temporal se responde en 2 días hábiles.
+    vence = (sumar_habiles(hoy, 2) if s.tipo == "bloqueo" else sumar_corridos(hoy, cfg.PLAZO_SOLICITUD_DIAS)).isoformat()
+    acuse = ahora()
     with bd() as c:
-        sid = c.execute("INSERT INTO solicitudes_derechos (usuario_id, tipo, detalle, creada, vence) VALUES (?,?,?,?,?)",
-                        (ctx.u["id"], s.tipo, s.detalle.strip(), ahora(), vence)).lastrowid
-    auditar("solicitud_derecho", ctx.u["id"], f"#{sid} {s.tipo}", ctx.ip)
-    return {"id": sid, "vence": vence}
+        sid = c.execute("INSERT INTO solicitudes_derechos (usuario_id, tipo, detalle, creada, vence, acuse_en) VALUES (?,?,?,?,?,?)",
+                        (ctx.u["id"], s.tipo, s.detalle.strip(), acuse, vence, acuse)).lastrowid
+    auditar("solicitud_derecho", ctx.u["id"], f"#{sid} {s.tipo} · acuse de recibo emitido · vence {vence}", ctx.ip)
+    return {"id": sid, "vence": vence, "acuse_en": acuse, "dirigida_a": cfg.JEFE_SERVICIO,
+            "plazo": "2 días hábiles" if s.tipo == "bloqueo" else f"{cfg.PLAZO_SOLICITUD_DIAS} días corridos"}
 
 
 @app.get("/api/cuenta/solicitudes")
 def mis_solicitudes(ctx: Contexto = Depends(sesion_lista)):
     with bd() as c:
-        filas = c.execute("SELECT id, tipo, detalle, estado, creada, vence, respuesta FROM solicitudes_derechos "
+        filas = c.execute("SELECT id, tipo, detalle, estado, creada, vence, respuesta, acuse_en, prorrogada, "
+                          "prorroga_motivo, respondida_en FROM solicitudes_derechos "
                           "WHERE usuario_id=? ORDER BY id DESC", (ctx.u["id"],)).fetchall()
     return [{**dict(f), "tipo_nombre": TIPOS_SOLICITUD[f["tipo"]]} for f in filas]
 

@@ -2,9 +2,12 @@
 
 Se importa al final de app.py, cuando la sesión y los helpers ya están definidos.
 """
+import hashlib
 import re
+from datetime import date
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,7 +15,8 @@ from pydantic import BaseModel, Field
 
 import config as cfg
 from app import TIPOS_SOLICITUD, Contexto, ETIQUETAS_ACCION, ip_de, sesion_lista
-from db import ahora, auditar, bd, verificar_auditoria
+from db import ahora, auditar, bd, guardar_ajuste, leer_ajuste, verificar_auditoria
+from plazos import sumar_corridos
 from seguridad import clave_temporal, enmascarar_rut, formatear_rut, hash_clave, normalizar_rut
 
 router = APIRouter()
@@ -66,6 +70,8 @@ class SolicitudCuenta(BaseModel):
 
 @router.post("/api/publico/solicitar-cuenta")
 def solicitar_cuenta(s: SolicitudCuenta, request: Request):
+    if formularios_pausados():
+        raise HTTPException(503, "Este formulario está pausado temporalmente por seguridad. Llama a la Mesa de ayuda.")
     limitar(request, "cuenta")
     rut = normalizar_rut(s.rut)
     if not rut:
@@ -92,6 +98,8 @@ class SolicitudClave(BaseModel):
 
 @router.post("/api/publico/recuperar-clave")
 def recuperar_clave(s: SolicitudClave, request: Request):
+    if formularios_pausados():
+        raise HTTPException(503, "Este formulario está pausado temporalmente por seguridad. Llama a la Mesa de ayuda.")
     limitar(request, "clave")
     rut = normalizar_rut(s.rut)
     if not rut:
@@ -112,6 +120,18 @@ def solo_admin(ctx: Contexto = Depends(sesion_lista)) -> Contexto:
     return ctx
 
 
+def perfiles(*roles):
+    def dep(ctx: Contexto = Depends(sesion_lista)) -> Contexto:
+        if ctx.u["rol"] not in roles:
+            raise HTTPException(403, "Tu perfil no tiene acceso a esta sección.")
+        return ctx
+    return dep
+
+
+auditoria_o_gestion = perfiles("admin", "dpd", "seguridad")
+seguridad_o_admin = perfiles("admin", "seguridad")
+
+
 def admin_o_dpd(ctx: Contexto = Depends(sesion_lista)) -> Contexto:
     if ctx.u["rol"] not in ("admin", "dpd"):
         raise HTTPException(403, "Necesitas perfil de administrador o de Delegado de Protección de Datos.")
@@ -129,7 +149,7 @@ def _usuario_dict(u) -> dict:
 
 # ------------------------------------------------------------------ resumen
 @router.get("/api/admin/resumen")
-def resumen(ctx: Contexto = Depends(admin_o_dpd)):
+def resumen(ctx: Contexto = Depends(auditoria_o_gestion)):
     with bd() as c:
         n = lambda q: c.execute(q).fetchone()[0]  # noqa: E731
         return {
@@ -143,6 +163,10 @@ def resumen(ctx: Contexto = Depends(admin_o_dpd)):
             "derechos_vencidos": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence < date('now')"),
             "modulos": n("SELECT COUNT(*) FROM modulos"),
             "fallidos_24h": n("SELECT COUNT(*) FROM auditoria WHERE accion='login_fallido' AND ts > datetime('now','-1 day')"),
+            "incidentes_abiertos": n("SELECT COUNT(*) FROM incidentes WHERE estado<>'cerrado'"),
+            "alertas": alertas_seguridad(c),
+            "respaldo": estado_respaldo(),
+            "contencion": estado_contencion(),
         }
 
 
@@ -342,23 +366,56 @@ def listar_derechos(estado: str = "abiertas", ctx: Contexto = Depends(admin_o_dp
 
 
 class RespuestaDerecho(BaseModel):
-    estado: str
+    estado: str                      # en_revision | prorrogar | respondida | rechazada
     respuesta: str = Field(default="", max_length=3000)
+
+
+LEYENDA_RECLAMO = ("Conforme al artículo 11 de la Ley 21.719, si no estás conforme con esta respuesta puedes reclamar "
+                   "ante la Agencia de Protección de Datos Personales dentro de 30 días hábiles desde que la recibas.")
 
 
 @router.post("/api/admin/derechos/{sid}")
 def responder_derecho(sid: int, d: RespuestaDerecho, ctx: Contexto = Depends(admin_o_dpd)):
-    if d.estado not in ("en_revision", "respondida", "rechazada"):
+    if d.estado not in ("en_revision", "prorrogar", "respondida", "rechazada"):
         raise HTTPException(400, "Estado no válido.")
-    if d.estado in ("respondida", "rechazada") and len(d.respuesta.strip()) < 10:
-        raise HTTPException(400, "Escribe una respuesta fundada para la persona.")
+    texto = d.respuesta.strip()
     with bd() as c:
-        s = c.execute("SELECT usuario_id FROM solicitudes_derechos WHERE id=?", (sid,)).fetchone()
+        s = c.execute("SELECT * FROM solicitudes_derechos WHERE id=?", (sid,)).fetchone()
         if not s:
             raise HTTPException(404, "No existe la solicitud.")
-        c.execute("UPDATE solicitudes_derechos SET estado=?, respuesta=? WHERE id=?", (d.estado, d.respuesta.strip() or None, sid))
-    auditar("solicitud_derecho_" + d.estado, s["usuario_id"], f"#{sid} por usuario #{ctx.u['id']}", ctx.ip)
-    return {"ok": True}
+        if s["estado"] in ("respondida", "rechazada"):
+            raise HTTPException(409, "La solicitud ya fue cerrada; su respuesta quedó respaldada y no se modifica.")
+        if d.estado == "prorrogar":
+            # Art. 11: una sola prórroga de hasta 30 días corridos, informando al titular.
+            if s["tipo"] == "bloqueo":
+                raise HTTPException(400, "El bloqueo temporal no admite prórroga (2 días hábiles).")
+            if s["prorrogada"]:
+                raise HTTPException(400, "La ley permite prorrogar una sola vez.")
+            if len(texto) < 10:
+                raise HTTPException(400, "Explica a la persona el motivo de la prórroga.")
+            nuevo_vence = sumar_corridos(date.fromisoformat(s["vence"]), cfg.PLAZO_SOLICITUD_DIAS).isoformat()
+            c.execute("UPDATE solicitudes_derechos SET prorrogada=1, prorroga_motivo=?, vence=?, estado='en_revision' WHERE id=?",
+                      (texto, nuevo_vence, sid))
+            detalle = f"#{sid} prorrogada hasta {nuevo_vence} por usuario #{ctx.u['id']}"
+            accion = "solicitud_derecho_prorrogada"
+        elif d.estado == "en_revision":
+            c.execute("UPDATE solicitudes_derechos SET estado='en_revision' WHERE id=?", (sid,))
+            detalle, accion = f"#{sid} por usuario #{ctx.u['id']}", "solicitud_derecho_en_revision"
+        else:
+            if len(texto) < 10:
+                raise HTTPException(400, "Escribe una respuesta fundada para la persona.")
+            if d.estado == "rechazada" and LEYENDA_RECLAMO not in texto:
+                texto = f"{texto}\n\n{LEYENDA_RECLAMO}"
+            # Respaldo íntegro de la respuesta (art. 11): su hash queda sellado en la bitácora encadenada.
+            huella = hashlib.sha256(texto.encode()).hexdigest()
+            c.execute("UPDATE solicitudes_derechos SET estado=?, respuesta=?, respondida_en=?, respuesta_hash=? WHERE id=?",
+                      (d.estado, texto, ahora(), huella, sid))
+            detalle = f"#{sid} por usuario #{ctx.u['id']} · sha256 {huella}"
+            if d.estado == "rechazada" and s["tipo"] == "bloqueo":
+                detalle += " · comunicar el rechazo del bloqueo a la Agencia"
+            accion = "solicitud_derecho_" + d.estado
+    auditar(accion, s["usuario_id"], detalle, ctx.ip)
+    return {"ok": True, "avisar_agencia": d.estado == "rechazada" and s["tipo"] == "bloqueo"}
 
 
 # ------------------------------------------------------------------ módulos
@@ -437,7 +494,7 @@ def editar_modulo(mid: int, m: Modulo, ctx: Contexto = Depends(admin_o_dpd)):
 
 # ------------------------------------------------------------------ bitácora
 @router.get("/api/admin/auditoria")
-def ver_auditoria(q: str = "", accion: str = "", limite: int = 200, ctx: Contexto = Depends(admin_o_dpd)):
+def ver_auditoria(q: str = "", accion: str = "", limite: int = 200, ctx: Contexto = Depends(auditoria_o_gestion)):
     limite = max(1, min(limite, 1000))
     with bd() as c:
         filas = c.execute(
@@ -453,5 +510,229 @@ def ver_auditoria(q: str = "", accion: str = "", limite: int = 200, ctx: Context
 
 
 @router.get("/api/admin/auditoria/integridad")
-def integridad(ctx: Contexto = Depends(admin_o_dpd)):
+def integridad(ctx: Contexto = Depends(auditoria_o_gestion)):
     return verificar_auditoria()
+
+
+# ------------------------------------------------------------------ alertas (monitoreo dentro del portal)
+def _ts_sql(dt: datetime) -> str:
+    return dt.isoformat(timespec="seconds")
+
+
+def estado_respaldo() -> dict:
+    ultimo, prueba = leer_ajuste("ultimo_respaldo"), leer_ajuste("ultima_prueba_restauracion")
+    atrasado = True
+    if ultimo:
+        atrasado = datetime.now(timezone.utc) - datetime.fromisoformat(ultimo) > timedelta(hours=cfg.RESPALDO_MAX_HORAS)
+    return {"ultimo": ultimo, "ultima_prueba": prueba, "atrasado": atrasado}
+
+
+def estado_contencion() -> dict:
+    return {"modulos_suspendidos": leer_ajuste("modulos_suspendidos") is not None,
+            "formularios_pausados": leer_ajuste("formularios_pausados") == "1"}
+
+
+def alertas_seguridad(c) -> list[dict]:
+    """Señales para detectar a tiempo (Ley 21.663: alerta temprana a ANCI en 3 horas)."""
+    ahora_dt = datetime.now(timezone.utc)
+
+    def hace(**kw):
+        return _ts_sql(ahora_dt - timedelta(**kw))
+
+    al = []
+    fallidos = c.execute("SELECT COUNT(*) FROM auditoria WHERE accion='login_fallido' AND ts > ?", (hace(minutes=15),)).fetchone()[0]
+    if fallidos >= 10:
+        al.append({"nivel": "alta", "texto": f"{fallidos} intentos de acceso fallidos en los últimos 15 minutos. Posible ataque de fuerza bruta."})
+    bloqueos = c.execute("SELECT COUNT(*) FROM usuarios WHERE bloqueado_hasta > ?", (_ts_sql(ahora_dt),)).fetchone()[0]
+    if bloqueos >= 3:
+        al.append({"nivel": "media", "texto": f"{bloqueos} cuentas bloqueadas por intentos fallidos en este momento."})
+    ips = c.execute("SELECT COUNT(DISTINCT ip) FROM auditoria WHERE accion='login_fallido' AND ts > ?", (hace(hours=1),)).fetchone()[0]
+    if ips >= 5:
+        al.append({"nivel": "media", "texto": f"Intentos fallidos desde {ips} direcciones distintas en la última hora."})
+    madrugada = c.execute("""SELECT COUNT(*) FROM auditoria a JOIN usuarios u ON u.id=a.usuario_id
+                             WHERE a.accion='login' AND u.rol IN ('admin','dpd','seguridad') AND a.ts > ?
+                             AND (CAST(strftime('%H', a.ts) AS INTEGER) + 21) % 24 < 6""", (hace(hours=24),)).fetchone()[0]
+    if madrugada:
+        al.append({"nivel": "baja", "texto": f"{madrugada} ingreso(s) de cuentas privilegiadas de madrugada (00:00-06:00, hora de Chile aprox.) en las últimas 24 h."})
+    vencen = c.execute("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence <= date('now','+5 day')").fetchone()[0]
+    if vencen:
+        al.append({"nivel": "media", "texto": f"{vencen} solicitud(es) de derechos vencen en 5 días o menos."})
+    for inc in c.execute("SELECT * FROM incidentes WHERE estado<>'cerrado'").fetchall():
+        for p in plazos_incidente(inc):
+            if p["vencido"]:
+                al.append({"nivel": "alta", "texto": f"Incidente #{inc['id']}: venció el plazo de «{p['nombre']}»."})
+    r = estado_respaldo()
+    if r["atrasado"]:
+        al.append({"nivel": "alta" if r["ultimo"] else "media",
+                   "texto": "No hay respaldos registrados." if not r["ultimo"] else f"El último respaldo tiene más de {cfg.RESPALDO_MAX_HORAS} horas."})
+    if not r["ultima_prueba"] or datetime.now(timezone.utc) - datetime.fromisoformat(r["ultima_prueba"]) > timedelta(days=92):
+        al.append({"nivel": "media", "texto": "No se ha probado una restauración de respaldo en los últimos 3 meses."})
+    return al
+
+
+# ------------------------------------------------------------------ incidentes (Ley 21.663 y Ley 21.719)
+def plazos_incidente(inc) -> list[dict]:
+    """Ley 21.663 art. 9: alerta 3 h; actualización 72 h (24 h si un OIV ve afectado su servicio esencial);
+    informe final 15 días corridos; plan de acción del OIV 7 días corridos.
+    Ley 21.719 art. 14 sexies: Agencia "sin dilaciones indebidas" y titulares si hay datos sensibles
+    (aquí se usa 72 h como meta interna, no como plazo legal)."""
+    det = datetime.fromisoformat(inc["detectado_en"])
+    base = datetime.fromisoformat(inc["alerta_anci_en"]) if inc["alerta_anci_en"] else det
+    oiv_esencial = cfg.ES_OIV and inc["afecta_servicio_esencial"]
+    pasos = [
+        ("alerta_anci_en", "Alerta temprana a ANCI (CSIRT Nacional)", det + timedelta(hours=3), True),
+        ("actualizacion_anci_en", "Actualización a ANCI", det + timedelta(hours=24 if oiv_esencial else 72), True),
+        ("plan_accion_en", "Plan de acción a ANCI (OIV)", base + timedelta(days=7), cfg.ES_OIV),
+        ("informe_final_en", "Informe final a ANCI", base + timedelta(days=15), True),
+        ("agencia_notificada_en", "Aviso a la Agencia de Protección de Datos", det + timedelta(hours=72), bool(inc["afecta_datos_personales"])),
+        ("titulares_notificados_en", "Aviso a las personas afectadas", det + timedelta(hours=72), bool(inc["afecta_datos_sensibles"])),
+    ]
+    ahora_dt = datetime.now(timezone.utc)
+    return [{"campo": campo, "nombre": nombre, "limite": _ts_sql(limite), "hecho_en": inc[campo],
+             "vencido": not inc[campo] and ahora_dt > limite,
+             "meta_interna": campo in ("agencia_notificada_en", "titulares_notificados_en")}
+            for campo, nombre, limite, aplica in pasos if aplica]
+
+
+class Incidente(BaseModel):
+    titulo: str = Field(max_length=150)
+    descripcion: str = Field(default="", max_length=4000)
+    detectado_en: str | None = None
+    severidad: str = "media"
+    afecta_servicio_esencial: bool = False
+    afecta_datos_personales: bool = False
+    afecta_datos_sensibles: bool = False
+
+
+def _incidente_dict(inc) -> dict:
+    d = dict(inc)
+    for k in ("afecta_servicio_esencial", "afecta_datos_personales", "afecta_datos_sensibles"):
+        d[k] = bool(d[k])
+    d["plazos"] = plazos_incidente(inc)
+    return d
+
+
+@router.get("/api/admin/incidentes")
+def listar_incidentes(ctx: Contexto = Depends(auditoria_o_gestion)):
+    with bd() as c:
+        filas = c.execute("""SELECT i.*, u.nombre AS registrado_por_nombre FROM incidentes i
+                             LEFT JOIN usuarios u ON u.id=i.registrado_por ORDER BY (i.estado='cerrado'), i.id DESC""").fetchall()
+    return {"es_oiv": cfg.ES_OIV, "incidentes": [_incidente_dict(f) for f in filas]}
+
+
+@router.post("/api/admin/incidentes")
+def crear_incidente(d: Incidente, ctx: Contexto = Depends(seguridad_o_admin)):
+    if d.severidad not in ("baja", "media", "alta", "critica"):
+        raise HTTPException(400, "Severidad no válida.")
+    if len(d.titulo.strip()) < 5:
+        raise HTTPException(400, "Describe brevemente el incidente.")
+    try:
+        detectado = (datetime.fromisoformat(d.detectado_en) if d.detectado_en else datetime.now(timezone.utc))
+        if detectado.tzinfo is None:
+            raise ValueError
+        detectado = detectado.astimezone(timezone.utc)
+    except ValueError:
+        raise HTTPException(400, "Fecha de detección no válida.")
+    if detectado > datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise HTTPException(400, "La detección no puede estar en el futuro.")
+    with bd() as c:
+        iid = c.execute("""INSERT INTO incidentes (titulo, descripcion, detectado_en, registrado_por, registrado_en, severidad,
+                           afecta_servicio_esencial, afecta_datos_personales, afecta_datos_sensibles) VALUES (?,?,?,?,?,?,?,?,?)""",
+                        (d.titulo.strip(), d.descripcion.strip(), _ts_sql(detectado), ctx.u["id"], ahora(), d.severidad,
+                         int(d.afecta_servicio_esencial), int(d.afecta_datos_personales or d.afecta_datos_sensibles),
+                         int(d.afecta_datos_sensibles))).lastrowid
+    auditar("incidente_registrado", ctx.u["id"], f"#{iid} {d.severidad}: {d.titulo.strip()[:80]}", ctx.ip)
+    return {"id": iid}
+
+
+class HitoIncidente(BaseModel):
+    hito: str
+    nota: str = Field(default="", max_length=1000)
+
+
+HITOS = {"alerta_anci_en", "actualizacion_anci_en", "plan_accion_en", "informe_final_en",
+         "agencia_notificada_en", "titulares_notificados_en", "contenido", "cerrado", "nota"}
+
+
+@router.post("/api/admin/incidentes/{iid}/hito")
+def marcar_hito(iid: int, d: HitoIncidente, ctx: Contexto = Depends(seguridad_o_admin)):
+    if d.hito not in HITOS:
+        raise HTTPException(400, "Hito no válido.")
+    with bd() as c:
+        inc = c.execute("SELECT * FROM incidentes WHERE id=?", (iid,)).fetchone()
+        if not inc:
+            raise HTTPException(404, "No existe el incidente.")
+        if inc["estado"] == "cerrado":
+            raise HTTPException(409, "El incidente está cerrado.")
+        nota = f"[{ahora()[:16].replace('T', ' ')} UTC · {ctx.u['nombre']}] {d.hito}: {d.nota.strip()}" if d.nota.strip() else None
+        notas = "\n".join(x for x in (inc["notas"], nota) if x)
+        if d.hito == "nota":
+            if not nota:
+                raise HTTPException(400, "Escribe la nota.")
+            c.execute("UPDATE incidentes SET notas=? WHERE id=?", (notas, iid))
+        elif d.hito == "contenido":
+            c.execute("UPDATE incidentes SET estado='contenido', notas=? WHERE id=?", (notas, iid))
+        elif d.hito == "cerrado":
+            pendientes = [p["nombre"] for p in plazos_incidente(inc) if not p["hecho_en"]]
+            if pendientes and len(d.nota.strip()) < 10:
+                raise HTTPException(400, "Quedan reportes sin marcar: " + ", ".join(pendientes) + ". Justifica el cierre en la nota.")
+            c.execute("UPDATE incidentes SET estado='cerrado', cerrado_en=?, notas=? WHERE id=?", (ahora(), notas, iid))
+        else:
+            c.execute(f"UPDATE incidentes SET {d.hito}=?, notas=? WHERE id=?", (ahora(), notas, iid))
+    auditar("incidente_actualizado", ctx.u["id"], f"#{iid} {d.hito}", ctx.ip)
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ contención (ANCI, Instrucción General N° 4)
+class Confirmacion(BaseModel):
+    clave: str = Field(max_length=200)
+    motivo: str = Field(default="", max_length=500)
+
+
+ACCIONES_CONTENCION = {"cerrar-sesiones", "forzar-cambio-privilegiadas", "suspender-modulos", "reanudar-modulos",
+                       "pausar-formularios", "reanudar-formularios"}
+
+
+@router.post("/api/admin/contencion/{accion}")
+def contencion(accion: str, d: Confirmacion, ctx: Contexto = Depends(seguridad_o_admin)):
+    from seguridad import verificar_clave
+    if accion not in ACCIONES_CONTENCION:
+        raise HTTPException(404, "Acción no válida.")
+    if not verificar_clave(d.clave, ctx.u["clave_hash"]):
+        auditar("contencion_rechazada", ctx.u["id"], f"{accion}: contraseña incorrecta", ctx.ip)
+        raise HTTPException(401, "Contraseña incorrecta.")
+    if len(d.motivo.strip()) < 5:
+        raise HTTPException(400, "Indica el motivo (queda en la bitácora).")
+    res = {}
+    if accion == "suspender-modulos" and leer_ajuste("modulos_suspendidos") is not None:
+        raise HTTPException(409, "Los módulos ya están suspendidos.")
+    if accion == "reanudar-modulos" and leer_ajuste("modulos_suspendidos") is None:
+        raise HTTPException(409, "No hay módulos suspendidos.")
+    guardados = leer_ajuste("modulos_suspendidos")
+    with bd() as c:
+        if accion == "cerrar-sesiones":
+            res["sesiones_cerradas"] = c.execute("DELETE FROM sesiones WHERE id<>?", (ctx.s["id"],)).rowcount
+        elif accion == "forzar-cambio-privilegiadas":
+            res["cuentas"] = c.execute("UPDATE usuarios SET debe_cambiar_clave=1 WHERE rol IN ('admin','dpd','seguridad')").rowcount
+            c.execute("""DELETE FROM sesiones WHERE id<>? AND usuario_id IN
+                         (SELECT id FROM usuarios WHERE rol IN ('admin','dpd','seguridad'))""", (ctx.s["id"],))
+        elif accion == "suspender-modulos":
+            activos = [r[0] for r in c.execute("SELECT id FROM modulos WHERE activo=1")]
+            c.execute("UPDATE modulos SET activo=0")
+            c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('modulos_suspendidos', ?, ?)",
+                      (",".join(map(str, activos)), ahora()))
+            res["modulos"] = len(activos)
+        elif accion == "reanudar-modulos":
+            ids = [int(x) for x in (guardados or "").split(",") if x]
+            c.executemany("UPDATE modulos SET activo=1 WHERE id=?", [(i,) for i in ids])
+            c.execute("DELETE FROM ajustes WHERE clave='modulos_suspendidos'")
+            res["modulos"] = len(ids)
+        else:
+            c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('formularios_pausados', ?, ?)",
+                      ("1" if accion == "pausar-formularios" else "0", ahora()))
+    auditar("contencion_" + accion.replace("-", "_"), ctx.u["id"], d.motivo.strip()[:300], ctx.ip)
+    return {"ok": True, **res}
+
+
+def formularios_pausados() -> bool:
+    return leer_ajuste("formularios_pausados") == "1"

@@ -159,7 +159,7 @@ function dialogoCambioClave({ obligatorio = false } = {}) {
       <form class="form-clave" autocomplete="on">
         <div class="campo"><input type="password" id="cc-actual" placeholder=" " autocomplete="current-password" required><label for="cc-actual">${obligatorio ? "Contraseña temporal" : "Contraseña actual"}</label></div>
         <div class="campo"><input type="password" id="cc-nueva" placeholder=" " autocomplete="new-password" required><label for="cc-nueva">Nueva contraseña</label>
-          <div class="ayuda">Mínimo 10 caracteres, con letras y números. No uses tu RUT ni tu nombre.</div></div>
+          <div class="ayuda">Mínimo 15 caracteres. Usa una frase fácil de recordar (puedes usar espacios). No uses tu RUT, tu nombre ni contraseñas comunes.</div></div>
         <div class="campo"><input type="password" id="cc-repite" placeholder=" " autocomplete="new-password" required><label for="cc-repite">Confirmar</label></div>
         <div class="zona-error"></div>
       </form>`,

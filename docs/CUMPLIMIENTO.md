@@ -56,3 +56,19 @@ Con esos campos se puede generar automáticamente el **Registro de Actividades d
 4. Procedimiento de reporte de vulneraciones a la Agencia de Protección de Datos y a la ANCI.
 5. Integrar el alta/baja de usuarios con el registro de personal (hoy es manual desde el panel).
 6. Segundo factor (TOTP) para administradores.
+
+## Brechas del grupo A del informe normativo (noviembre 2026)
+
+| # | Brecha | Estado |
+|---|---|---|
+| A1 | Procedimiento de incidentes ANCI y Agencia | **Herramienta lista** (Administración › Incidentes) · procedimiento en `docs/plantillas/procedimiento_incidentes.md` por aprobar |
+| A2 | Delegado de ciberseguridad independiente de TI | **Perfil listo** · resolución en `docs/plantillas/resolucion_delegados.md` por firmar |
+| A3 | Política de Seguridad de la Información (DS 7) | Plantilla en `docs/plantillas/politica_seguridad_informacion.md` · verificar si existe una del SSVQ |
+| A4 | HTTPS con TLS 1.2+ y HSTS | **Listo en el código** (`backend/servidor.py`) · falta el certificado institucional |
+| A5 | Política pública con los 12 contenidos del art. 14 ter | **Página actualizada** (`/privacidad`) · faltan domicilio, enlace a la política de seguridad y la aprobación |
+| A6 | Flujo de derechos con plazos legales | **Listo** |
+| A7 | Respaldos cifrados con restauración probada | **Listo** · falta programar las tareas y guardar la clave fuera del servidor |
+| A8 | Monitoreo y alertas | **Listo en el portal** · falta un monitor externo de `/api/salud` y conectar un SIEM |
+| A9 | Botones de contención | **Listo** |
+| A10 | Bitácora en UTC, NTP y retención | **Listo en el código** · falta configurar NTP con SHOA en el servidor |
+| A11 | Contrato antes de conectar un LLM externo | Sin cambios: el asistente sigue siendo una maqueta local |

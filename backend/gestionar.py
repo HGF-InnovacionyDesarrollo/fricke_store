@@ -6,6 +6,7 @@
   python backend/gestionar.py desbloquear --rut 12.345.678-5
   python backend/gestionar.py listar
   python backend/gestionar.py verificar-auditoria
+  python backend/gestionar.py archivar-bitacora                  # según ECO_RETENCION_BITACORA_DIAS
   python backend/gestionar.py solicitudes                         # solicitudes de derechos pendientes
 """
 import argparse
@@ -42,6 +43,7 @@ def main():
         sub.add_parser(nombre).add_argument("--rut", required=True)
     sub.add_parser("listar")
     sub.add_parser("verificar-auditoria")
+    sub.add_parser("archivar-bitacora", help="archiva lo más antiguo que la retención configurada")
     sub.add_parser("solicitudes")
     a = p.parse_args()
 
@@ -90,6 +92,13 @@ def main():
         r = verificar_auditoria()
         print("Bitácora íntegra." if r["integra"] else f"¡ALERTA! Bitácora alterada en el registro #{r['falla_en_id']}.")
         print(r)
+
+    elif a.cmd == "archivar-bitacora":
+        import config as cfg
+        from db import archivar_auditoria
+        r = archivar_auditoria(cfg.RETENCION_BITACORA_DIAS, cfg.DB_PATH.parent / "archivo_bitacora")
+        print(r)
+        print(verificar_auditoria())
 
     elif a.cmd == "solicitudes":
         with bd() as db:

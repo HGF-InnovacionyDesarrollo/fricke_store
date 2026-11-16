@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import re
 import secrets
+from pathlib import Path
 
 
 # ---------------------------------------------------------------- RUT
@@ -65,27 +66,41 @@ def verificar_clave(clave: str, almacenado: str) -> bool:
 HASH_SEÑUELO = hash_clave(secrets.token_hex(8))
 
 
+# Lista de bloqueo (NIST SP 800-63B rev. 4): contraseñas comunes, filtradas o propias del contexto.
+_BLOQUEADAS_ARCHIVO = Path(__file__).with_name("claves_bloqueadas.txt")
+_BLOQUEADAS = {l.strip().lower() for l in _BLOQUEADAS_ARCHIVO.read_text(encoding="utf-8").splitlines()
+               if l.strip() and not l.startswith("#")} if _BLOQUEADAS_ARCHIVO.exists() else set()
+_CONTEXTO = ("fricke", "hospital", "gustavo", "innova", "password", "contrasena", "contraseña", "clave", "store",
+             "vinadelmar", "viñadelmar", "quillota", "chile")
+
+
 def problemas_clave(clave: str, rut: str, nombre: str = "") -> list[str]:
-    from config import CLAVE_LARGO_MIN
+    """Política NIST: largo mínimo y lista de bloqueo; sin reglas de composición ni rotación forzada."""
+    from config import CLAVE_LARGO_MAX, CLAVE_LARGO_MIN
     p = []
     if len(clave) < CLAVE_LARGO_MIN:
-        p.append(f"Debe tener al menos {CLAVE_LARGO_MIN} caracteres.")
-    if not re.search(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]", clave) or not re.search(r"\d", clave):
-        p.append("Debe combinar letras y números.")
+        p.append(f"Debe tener al menos {CLAVE_LARGO_MIN} caracteres. Una frase de varias palabras es fácil de recordar.")
+    if len(clave) > CLAVE_LARGO_MAX:
+        p.append(f"Puede tener hasta {CLAVE_LARGO_MAX} caracteres.")
+    normal = re.sub(r"[\s._-]", "", clave.lower())
     cuerpo = rut.split("-")[0]
     if cuerpo in re.sub(r"\D", "", clave):
         p.append("No puede contener tu RUT.")
-    for parte in (nombre or "").lower().split():
-        if len(parte) >= 4 and parte in clave.lower():
-            p.append("No puede contener tu nombre.")
-            break
+    if any(len(x) >= 4 and x in normal for x in (nombre or "").lower().split()):
+        p.append("No puede contener tu nombre.")
+    if clave.lower() in _BLOQUEADAS or normal in _BLOQUEADAS:
+        p.append("Es una contraseña muy común o filtrada. Elige otra.")
+    elif sum(len(c) for c in _CONTEXTO if c in normal) >= len(normal) * 0.6:
+        p.append("Es demasiado parecida al nombre del hospital o del sistema.")
+    if len(set(clave)) <= 3:
+        p.append("Repite demasiado los mismos caracteres.")
     return p
 
 
 def clave_temporal() -> str:
     alfabeto = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
     while True:
-        c = "".join(secrets.choice(alfabeto) for _ in range(12))
+        c = "".join(secrets.choice(alfabeto) for _ in range(16))
         if re.search(r"\d", c) and re.search(r"[A-Za-z]", c):
             return c
 

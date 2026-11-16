@@ -22,16 +22,24 @@ Por ahora no tiene módulos: se irán agregando de a poco (ver *Agregar un módu
 - **Panel de administración** (`/admin`, desde la tarjeta de cuenta): resumen, usuarios (crear, editar, perfil,
   restablecer, desbloquear, desactivar, cerrar sesiones), solicitudes de cuenta, pedidos de contraseña,
   derechos Ley 21.719 con plazos, módulos con su ficha de tratamiento y bitácora con verificación de integridad.
-- **Perfiles**: funcionario, administrador y Delegado de Protección de Datos (DPD: derechos, módulos y bitácora).
+- **Perfiles**: funcionario, administrador, Delegado de Protección de Datos y Delegado de Ciberseguridad.
+- **Incidentes** con plazos de ANCI (3 h, 24/72 h, 7 y 15 días) y de la Agencia de Protección de Datos, con cuenta regresiva y alertas.
+- **Contención** (IG N° 4 de ANCI): cerrar todas las sesiones, forzar cambio de claves privilegiadas, suspender módulos, pausar formularios.
+- **Alertas de seguridad** en el resumen, endpoint `/api/salud` para monitores y copia JSON de la bitácora para un SIEM.
+- **Respaldos cifrados** con prueba de restauración (`backend/respaldo.py`) y archivo sellado de la bitácora antigua.
+- **HTTPS** con HSTS y redirección (`backend/servidor.py`).
+- **Derechos Ley 21.719 con plazos legales**: acuse de recibo, 30 días corridos con una prórroga, bloqueo en 2 días hábiles, denegación con leyenda de reclamo y respuesta sellada.
+- **Contraseñas según NIST SP 800-63B rev. 4**: 15 caracteres mínimo y lista de bloqueo, sin reglas de composición.
 
-El detalle normativo está en [docs/CUMPLIMIENTO.md](docs/CUMPLIMIENTO.md).
+El detalle normativo está en [docs/CUMPLIMIENTO.md](docs/CUMPLIMIENTO.md); la puesta en producción, en [docs/OPERACION.md](docs/OPERACION.md);
+las plantillas para firma del Director, en [docs/plantillas/](docs/plantillas/); y el informe completo, en [reports/](reports/).
 
 ## Ejecutar
 
 ```bash
 pip install -r requirements.txt
 python backend/gestionar.py crear --rut 12.345.678-5 --nombre "Ana Pérez" --cargo "Enfermera" --unidad "UPC" --admin
-python -m uvicorn app:app --app-dir backend --port 8090
+python backend/servidor.py          # HTTP 8090; con ECO_TLS_CERT/ECO_TLS_KEY sirve HTTPS
 ```
 
 Abrir http://localhost:8090 e ingresar con el RUT y la clave temporal que imprime el comando `crear`.

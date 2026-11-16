@@ -44,13 +44,14 @@ document.addEventListener("click", (e) => {
 
   const resumen = await api("/api/admin/resumen");
   ROLES = resumen.roles; MI_ROL = resumen.rol;
-  document.querySelectorAll("[data-rol]").forEach((el) => { if (el.dataset.rol !== MI_ROL) el.remove(); });
+  document.querySelectorAll("[data-rol]").forEach((el) => { if (!el.dataset.rol.split(" ").includes(MI_ROL)) el.remove(); });
   pintarContadores(resumen);
 
   // ---------- navegación
   const secciones = [...document.querySelectorAll(".contenido section")];
   const cargadores = { resumen: cargarResumen, usuarios: cargarUsuarios, solicitudes: cargarSolicitudes, claves: cargarClaves,
-                       derechos: cargarDerechos, modulos: cargarModulos, bitacora: cargarBitacora };
+                       derechos: cargarDerechos, modulos: cargarModulos, bitacora: cargarBitacora,
+                       incidentes: cargarIncidentes, seguridad: cargarSeguridad };
   function mostrar() {
     const disponibles = [...document.querySelectorAll(".menu a")].map((a) => a.dataset.sec);
     let s = (location.hash || "#resumen").slice(1);
@@ -76,6 +77,9 @@ document.addEventListener("click", (e) => {
       ["Cuentas activas", r.usuarios_activos], ["Personas conectadas", r.sesiones_abiertas],
       ["Módulos", r.modulos], ["Accesos fallidos (24 h)", r.fallidos_24h, r.fallidos_24h >= 10],
     ];
+    const iconoNivel = { alta: "alerta", media: "info", baja: "info" };
+    $("#alertas").innerHTML = (r.alertas || []).map((a) =>
+      `<div class="alerta-fila ${a.nivel}" role="alert">${icono(iconoNivel[a.nivel])}<span>${esc(a.texto)}</span></div>`).join("");
     $("#metricas").innerHTML = m.map(([t, v, a]) => `<div class="metrica ${a ? "alerta" : ""}"><span>${t}</span><b>${v}</b></div>`).join("");
     const tareas = [
       MI_ROL === "admin" && r.solicitudes_cuenta && [`${r.solicitudes_cuenta} solicitud(es) de cuenta por revisar`, "#solicitudes", "documento"],
@@ -264,14 +268,166 @@ document.addEventListener("click", (e) => {
         clase: "amplio",
         html: `<p class="subtitulo">${esc(s.nombre)} · ${esc(s.rut)} · vence ${esc(fechaLocal(s.vence, false))}</p>
           <div class="aviso-suave" style="margin-bottom:18px">${icono("documento")}<span>${esc(s.detalle || "Sin detalle")}</span></div>
-          <div class="campo"><select id="rd-estado"><option value="en_revision">En revisión</option><option value="respondida" selected>Respondida</option><option value="rechazada">Rechazada (fundada)</option></select><label for="rd-estado">Estado</label></div>
-          <div class="campo"><textarea id="rd-resp" placeholder=" " maxlength="3000" style="height:140px">${esc(s.respuesta || "")}</textarea><label for="rd-resp">Respuesta para la persona</label>
-            <div class="ayuda">La persona la verá en Mi cuenta › Datos y privacidad.</div></div>
+          ${s.tipo === "bloqueo" ? `<div class="aviso-suave" style="margin-bottom:18px">${icono("alerta")}<span>Bloqueo temporal: responde en 2 días hábiles y no trates esos datos mientras tanto. Si lo rechazas, comunícalo electrónicamente a la Agencia.</span></div>` : ""}
+          ${s.prorrogada ? `<p class="subtitulo">Ya prorrogada: ${esc(s.prorroga_motivo || "")}</p>` : ""}
+          <div class="campo"><select id="rd-estado">
+            <option value="respondida" selected>Responder (acoger)</option>
+            <option value="rechazada">Denegar con fundamento</option>
+            <option value="en_revision">Marcar en revisión</option>
+            ${!s.prorrogada && s.tipo !== "bloqueo" ? '<option value="prorrogar">Prorrogar 30 días corridos (una sola vez)</option>' : ""}
+          </select><label for="rd-estado">Acción</label></div>
+          <div class="campo"><textarea id="rd-resp" placeholder=" " maxlength="3000" style="height:140px"></textarea><label for="rd-resp">Texto para la persona</label>
+            <div class="ayuda" id="rd-ayuda">La persona la verá en Mi cuenta › Datos y privacidad. Una vez enviada, la respuesta queda sellada y no se puede editar.</div></div>
           <div class="zona-error"></div>`,
         acciones: [{ texto: "Cancelar", clase: "btn btn-texto", valor: null }, { texto: "Guardar", alHacer: async (v) => {
-          try { await api(`/api/admin/derechos/${s.id}`, { metodo: "POST", datos: { estado: v.querySelector("#rd-estado").value, respuesta: v.querySelector("#rd-resp").value } });
-                toast("Solicitud actualizada."); cargarDerechos(); refrescarContadores(); return true; }
+          try { const r = await api(`/api/admin/derechos/${s.id}`, { metodo: "POST", datos: { estado: v.querySelector("#rd-estado").value, respuesta: v.querySelector("#rd-resp").value } });
+                toast(r.avisar_agencia ? "Guardado. Recuerda comunicar el rechazo del bloqueo a la Agencia." : "Solicitud actualizada.", 6000);
+                cargarDerechos(); refrescarContadores(); return true; }
           catch (e) { mostrarErrorEn(v.querySelector(".zona-error"), e.message); return false; } } }],
+      });
+      const velo = [...document.querySelectorAll(".velo")].pop();
+      const ayudas = {
+        respondida: "La persona la verá en Mi cuenta › Datos y privacidad. Una vez enviada, la respuesta queda sellada y no se puede editar.",
+        rechazada: "Explica el fundamento legal (por ejemplo art. 23 de la Ley 21.719). Se agrega automáticamente la leyenda sobre el reclamo ante la Agencia en 30 días hábiles.",
+        en_revision: "Opcional. Indica que estás revisando la solicitud.",
+        prorrogar: "Explica a la persona por qué necesitas más tiempo. El nuevo plazo se suma al actual.",
+      };
+      velo.querySelector("#rd-estado").onchange = (e) => { velo.querySelector("#rd-ayuda").textContent = ayudas[e.target.value]; };
+    });
+  }
+
+  // ---------- incidentes
+  $("#btn-nuevo-incidente")?.addEventListener("click", nuevoIncidente);
+  const puedeGestionarIncidentes = () => ["admin", "seguridad"].includes(MI_ROL);
+  const SEVERIDAD = { baja: "Baja", media: "Media", alta: "Alta", critica: "Crítica" };
+
+  function nuevoIncidente() {
+    const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    dialogo({
+      titulo: "Registrar incidente",
+      clase: "amplio",
+      html: `<div class="aviso-suave" style="margin-bottom:18px">${icono("alerta")}<span>Registra apenas lo detectes: la alerta temprana a ANCI vence 3 horas después de la detección.</span></div>
+        <div class="campo"><input id="in-titulo" placeholder=" " maxlength="150"><label for="in-titulo">¿Qué pasó? (resumen)</label></div>
+        <div class="campo"><textarea id="in-desc" placeholder=" " maxlength="4000"></textarea><label for="in-desc">Detalle: sistemas afectados, cómo se detectó, primeras acciones</label></div>
+        <div class="dlg-grid">
+          <div class="campo"><input id="in-fecha" type="datetime-local" value="${local}" max="${local}"><label for="in-fecha">Detectado el (hora local)</label></div>
+          <div class="campo"><select id="in-sev">${Object.entries(SEVERIDAD).map(([k, n]) => `<option value="${k}" ${k === "media" ? "selected" : ""}>${n}</option>`).join("")}</select><label for="in-sev">Severidad</label></div>
+        </div>
+        <div class="check-lista">
+          <label class="check"><input type="checkbox" id="in-esencial"> Afecta la atención o un servicio esencial del hospital</label>
+          <label class="check"><input type="checkbox" id="in-personales"> Compromete datos personales</label>
+          <label class="check"><input type="checkbox" id="in-sensibles"> Compromete datos de salud u otros sensibles</label>
+        </div>
+        <div class="zona-error"></div>`,
+      acciones: [{ texto: "Cancelar", clase: "btn btn-texto", valor: null }, { texto: "Registrar", alHacer: async (v) => {
+        const val = (id) => v.querySelector(id);
+        const fecha = val("#in-fecha").value ? new Date(val("#in-fecha").value).toISOString() : null;
+        try {
+          await api("/api/admin/incidentes", { metodo: "POST", datos: {
+            titulo: val("#in-titulo").value, descripcion: val("#in-desc").value, detectado_en: fecha, severidad: val("#in-sev").value,
+            afecta_servicio_esencial: val("#in-esencial").checked, afecta_datos_personales: val("#in-personales").checked,
+            afecta_datos_sensibles: val("#in-sensibles").checked } });
+          toast("Incidente registrado. Revisa los plazos de reporte."); cargarIncidentes(); refrescarContadores(); return true;
+        } catch (e) { mostrarErrorEn(v.querySelector(".zona-error"), e.message); return false; }
+      } }],
+    });
+  }
+
+  function restante(limiteIso) {
+    const ms = new Date(limiteIso) - Date.now();
+    const abs = Math.abs(ms), h = Math.floor(abs / 3600e3), m = Math.floor((abs % 3600e3) / 60e3), d = Math.floor(h / 24);
+    const txt = d >= 2 ? `${d} días` : h >= 1 ? `${h} h ${m} min` : `${m} min`;
+    return ms >= 0 ? `quedan ${txt}` : `venció hace ${txt}`;
+  }
+
+  async function cargarIncidentes() {
+    const { es_oiv, incidentes } = await api("/api/admin/incidentes");
+    if (es_oiv && !$("#intro-incidentes").dataset.oiv) {
+      $("#intro-incidentes").dataset.oiv = "1";
+      $("#intro-incidentes").insertAdjacentHTML("beforeend", " Configurado como Operador de Importancia Vital: actualización en 24 h si se afecta un servicio esencial y plan de acción en 7 días.");
+    }
+    const gestiona = puedeGestionarIncidentes();
+    $("#lista-incidentes").innerHTML = incidentes.length ? incidentes.map((i) => `
+      <div class="incidente ${i.estado === "cerrado" ? "cerrado" : ""}">
+        <div class="incidente-cab">
+          <div><h3>#${i.id} · ${esc(i.titulo)}</h3>
+            <p class="meta">Detectado ${esc(fechaLocal(i.detectado_en))} · registró ${esc(i.registrado_por_nombre || "—")}</p></div>
+          <div class="chips"><span class="chip ${["alta", "critica"].includes(i.severidad) ? "alerta" : "acento"}">${SEVERIDAD[i.severidad]}</span>
+            <span class="chip ${i.estado === "cerrado" ? "ok" : "info"}">${i.estado === "abierto" ? "Abierto" : i.estado === "contenido" ? "Contenido" : "Cerrado"}</span>
+            ${i.afecta_datos_sensibles ? '<span class="chip alerta">Datos sensibles</span>' : i.afecta_datos_personales ? '<span class="chip acento">Datos personales</span>' : ""}</div>
+        </div>
+        ${i.descripcion ? `<p style="margin:0;font-size:14px">${esc(i.descripcion)}</p>` : ""}
+        <div class="plazos">${i.plazos.map((p) => `
+          <div class="plazo ${p.hecho_en ? "hecho" : p.vencido ? "vencido" : ""}">
+            <span>${esc(p.nombre)}${p.meta_interna ? " <small>(meta interna; la ley dice «sin dilaciones indebidas»)</small>" : ""}<br>
+              <small>${p.hecho_en ? "Hecho " + esc(fechaLocal(p.hecho_en)) : "Límite " + esc(fechaLocal(p.limite)) + " · " + restante(p.limite)}</small></span>
+            <span></span>
+            <span>${!p.hecho_en && gestiona && i.estado !== "cerrado" ? `<button class="btn btn-borde" data-hito="${p.campo}" data-i="${i.id}">Marcar hecho</button>` : ""}</span>
+          </div>`).join("")}</div>
+        ${i.notas ? `<div class="notas-incidente">${esc(i.notas)}</div>` : ""}
+        ${gestiona && i.estado !== "cerrado" ? `<div class="acciones-fila" style="margin-top:10px">
+          <button class="btn btn-texto" data-hito="nota" data-i="${i.id}">Agregar nota</button>
+          ${i.estado === "abierto" ? `<button class="btn btn-borde" data-hito="contenido" data-i="${i.id}">Marcar contenido</button>` : ""}
+          <button class="btn btn-borde" data-hito="cerrado" data-i="${i.id}">Cerrar incidente</button></div>` : ""}
+      </div>`).join("") : '<div class="tabla">' + vacio("No hay incidentes registrados.") + "</div>";
+    $("#lista-incidentes").querySelectorAll("[data-hito]").forEach((b) => b.onclick = () => {
+      const hito = b.dataset.hito;
+      const titulos = { contenido: "Marcar como contenido", cerrado: "Cerrar incidente", nota: "Agregar nota" };
+      dialogo({
+        titulo: titulos[hito] || "Registrar reporte",
+        html: `<div class="campo"><textarea id="hi-nota" placeholder=" " maxlength="1000"></textarea><label for="hi-nota">${hito.endsWith("_en") ? "N° de ticket o comprobante del envío (recomendado)" : "Nota"}</label></div><div class="zona-error"></div>`,
+        acciones: [{ texto: "Cancelar", clase: "btn btn-texto", valor: null }, { texto: "Guardar", alHacer: async (v) => {
+          const nota = v.querySelector("#hi-nota").value;
+          if (hito === "nota" && !nota.trim()) { mostrarErrorEn(v.querySelector(".zona-error"), "Escribe la nota."); return false; }
+          try {
+            await api(`/api/admin/incidentes/${b.dataset.i}/hito`, { metodo: "POST", datos: { hito, nota } });
+            cargarIncidentes(); refrescarContadores(); return true;
+          } catch (e) { mostrarErrorEn(v.querySelector(".zona-error"), e.message); return false; }
+        } }],
+      });
+    });
+  }
+
+  // ---------- seguridad y respaldos
+  const CONTENCION = [
+    ["cerrar-sesiones", "Cerrar todas las sesiones", "Expulsa a todas las personas conectadas, salvo tu sesión actual."],
+    ["forzar-cambio-privilegiadas", "Forzar cambio de contraseña a cuentas privilegiadas", "Administradores, DPD y delegado de ciberseguridad deberán crear una contraseña nueva (tú incluido)."],
+    ["suspender-modulos", "Suspender todos los módulos", "Los oculta del menú hasta reanudarlos. Útil si un módulo está comprometido."],
+    ["reanudar-modulos", "Reanudar módulos", "Vuelve a activar los módulos que estaban activos antes de suspender."],
+    ["pausar-formularios", "Pausar formularios públicos", "Detiene las solicitudes de cuenta y de contraseña desde la pantalla de ingreso."],
+    ["reanudar-formularios", "Reanudar formularios públicos", ""],
+  ];
+  async function cargarSeguridad() {
+    const r = await api("/api/admin/resumen");
+    const rp = r.respaldo, ct = r.contencion;
+    $("#estado-respaldo").innerHTML = `
+      <div class="fila"><span data-icono="descargar"></span><span>Último respaldo<small>${rp.ultimo ? esc(fechaLocal(rp.ultimo)) : "Nunca"}</small></span>
+        <span class="chip ${rp.atrasado ? "alerta" : "ok"}">${rp.atrasado ? "Atrasado" : "Al día"}</span></div>
+      <div class="fila"><span data-icono="escudo"></span><span>Última prueba de restauración<small>${rp.ultima_prueba ? esc(fechaLocal(rp.ultima_prueba)) : "Nunca"} · se recomienda cada 3 meses</small></span><span></span></div>
+      <div class="vacio">Los respaldos se crean y prueban en el servidor con <code>python backend/respaldo.py crear</code> y <code>probar</code> (tarea programada diaria). Ver docs/OPERACION.md.</div>`;
+    pintarIconos($("#estado-respaldo"));
+    const activa = { "reanudar-modulos": ct.modulos_suspendidos, "suspender-modulos": !ct.modulos_suspendidos,
+                     "pausar-formularios": !ct.formularios_pausados, "reanudar-formularios": ct.formularios_pausados };
+    $("#acciones-contencion").innerHTML = CONTENCION.filter(([k]) => activa[k] !== false).map(([k, n, d]) => `
+      <button class="fila accion" data-cont="${k}"><span data-icono="${k.startsWith("reanudar") ? "historial" : "candado"}"></span>
+        <span>${esc(n)}<small>${esc(d)}</small></span><span data-icono="flecha"></span></button>`).join("");
+    pintarIconos($("#acciones-contencion"));
+    $("#acciones-contencion").querySelectorAll("[data-cont]").forEach((b) => b.onclick = () => {
+      const [k, n, d] = CONTENCION.find(([x]) => x === b.dataset.cont);
+      dialogo({
+        titulo: n,
+        html: `<p class="dlg-texto">${esc(d)}</p>
+          <div class="campo"><input id="ct-motivo" placeholder=" " maxlength="500"><label for="ct-motivo">Motivo (incidente #, simulacro, etc.)</label></div>
+          <div class="campo"><input id="ct-clave" type="password" placeholder=" " autocomplete="current-password"><label for="ct-clave">Confirma con tu contraseña</label></div>
+          <div class="zona-error"></div>`,
+        acciones: [{ texto: "Cancelar", clase: "btn btn-texto", valor: null }, { texto: "Ejecutar", alHacer: async (v) => {
+          try {
+            const res = await api(`/api/admin/contencion/${k}`, { metodo: "POST", datos: { clave: v.querySelector("#ct-clave").value, motivo: v.querySelector("#ct-motivo").value } });
+            toast(`${n}: listo${res.sesiones_cerradas !== undefined ? ` (${res.sesiones_cerradas} sesiones)` : res.cuentas !== undefined ? ` (${res.cuentas} cuentas)` : res.modulos !== undefined ? ` (${res.modulos} módulos)` : ""}.`, 6000);
+            if (k === "forzar-cambio-privilegiadas") setTimeout(() => location.reload(), 1500);
+            cargarSeguridad(); return true;
+          } catch (e) { mostrarErrorEn(v.querySelector(".zona-error"), e.message); return false; }
+        } }],
       });
     });
   }

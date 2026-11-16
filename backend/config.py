@@ -28,18 +28,45 @@ VENTANA_PUBLICO_MIN = int(os.environ.get("ECO_VENTANA_PUBLICO_MIN", 15))
 # Si se define (p. ej. "hospitalfricke.cl"), las solicitudes de cuenta exigen correo de ese dominio
 DOMINIO_CORREO = os.environ.get("ECO_DOMINIO_CORREO", "").strip().lower()
 
+# Jefe superior del servicio: a quien se dirigen las solicitudes de derechos (Ley 21.719 art. 23)
+JEFE_SERVICIO = os.environ.get("ECO_JEFE_SERVICIO", "Director(a) del Hospital Dr. Gustavo Fricke")
+
+# Ley 21.663: el hospital figura como Operador de Importancia Vital (verificar Res. Ex. 87/2025 en el Diario Oficial).
+# Como OIV, la actualización a ANCI se acorta a 24 h cuando se afecta el servicio esencial y se exige plan de acción.
+ES_OIV = os.environ.get("ECO_ES_OIV", "1") == "1"
+
+# Retención de la bitácora (días). Lo más antiguo se archiva sellado, sin romper la cadena.
+RETENCION_BITACORA_DIAS = int(os.environ.get("ECO_RETENCION_BITACORA_DIAS", 1825))  # 5 años
+
+# Copia de cada evento de auditoría en JSON por línea, para un SIEM. Vacío para desactivar.
+_siem = os.environ.get("ECO_LOG_SIEM", str(BASE_DIR / "data" / "logs" / "auditoria.jsonl"))
+LOG_SIEM = Path(_siem) if _siem else None
+
+# Respaldos
+RESPALDOS_DIR = Path(os.environ.get("ECO_RESPALDOS_DIR", BASE_DIR / "data" / "respaldos"))
+RESPALDO_COPIA_EXTERNA = os.environ.get("ECO_RESPALDO_COPIA", "")      # p. ej. \\servidor\respaldos\fricke
+RESPALDO_CLAVE_ARCHIVO = Path(os.environ.get("ECO_RESPALDO_CLAVE", BASE_DIR / "data" / "respaldo.key"))
+RESPALDOS_A_CONSERVAR = int(os.environ.get("ECO_RESPALDOS_CONSERVAR", 30))
+RESPALDO_MAX_HORAS = int(os.environ.get("ECO_RESPALDO_MAX_HORAS", 26))   # alerta si el último es más antiguo
+
+# HTTPS (si se definen, servidor.py levanta TLS y el portal envía HSTS)
+TLS_CERT = os.environ.get("ECO_TLS_CERT", "")
+TLS_KEY = os.environ.get("ECO_TLS_KEY", "")
+
 # Perfiles de acceso
 ROLES = {
     "funcionario": "Funcionario",
     "admin": "Administrador",
     "dpd": "Delegado de Protección de Datos",
+    "seguridad": "Delegado de Ciberseguridad",
 }
 
 # Contraseñas
-CLAVE_LARGO_MIN = 10
+CLAVE_LARGO_MIN = 15   # NIST SP 800-63B rev. 4 para un solo factor
+CLAVE_LARGO_MAX = 128
 
 # Versión vigente del aviso de privacidad. Al cambiarla, todos deben volver a leerlo.
-VERSION_AVISO = os.environ.get("ECO_VERSION_AVISO", "2026-11")
+VERSION_AVISO = os.environ.get("ECO_VERSION_AVISO", "2026-11b")
 
 # Plazo de respuesta a solicitudes de derechos (Ley 21.719): 30 días corridos, prorrogables.
 PLAZO_SOLICITUD_DIAS = 30
