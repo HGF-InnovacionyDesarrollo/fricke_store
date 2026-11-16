@@ -12,6 +12,7 @@
   document.getElementById("btn-cuenta").title = `${yo.nombre}\n${yo.rut}`;
   document.getElementById("cuenta-rut").textContent = yo.rut;
   document.getElementById("cuenta-hola").textContent = `¡Hola, ${yo.nombre.split(" ")[0]}!`;
+  if (yo.puede_administrar) document.getElementById("btn-admin").classList.remove("oculto");
   document.getElementById("cuenta-cargo").textContent = [yo.cargo, yo.unidad].filter(Boolean).join(" · ");
 
   // ---------- paneles flotantes

@@ -33,11 +33,14 @@
       <input id="clave" name="clave" type="password" autocomplete="current-password" placeholder=" " required>
       <label for="clave">Contraseña</label>
     </div>
-    <label class="check"><input type="checkbox" id="ver-clave"> Mostrar contraseña</label>
+    <div class="fila-clave">
+      <label class="check"><input type="checkbox" id="ver-clave"> Mostrar contraseña</label>
+      <button type="button" class="enlace" id="olvide">¿Olvidaste tu contraseña?</button>
+    </div>
     <div class="zona-error" id="error-login"></div>
     <p class="nota">¿Estás en un equipo compartido? Bloquea o cierra tu sesión al terminar. Tus accesos quedan registrados.</p>
     <div class="acciones">
-      <button type="button" class="btn btn-texto" id="olvide">¿Olvidaste tu contraseña?</button>
+      <button type="button" class="btn btn-texto" id="crear-cuenta">Solicitar una cuenta</button>
       <button class="btn" id="btn-ingresar">Siguiente</button>
     </div>
   </form>

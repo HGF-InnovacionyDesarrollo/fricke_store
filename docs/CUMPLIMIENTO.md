@@ -24,6 +24,15 @@ Mapa de qué hace el ecosistema para cumplir la **Ley 21.719** (protección de d
 | Portabilidad | Mismo archivo JSON, formato estructurado y de uso común. |
 | Información sobre su actividad | *Mi cuenta › Seguridad*: sesiones abiertas (con cierre remoto) y últimos 50 eventos, con los intentos fallidos destacados. |
 
+## Alta de cuentas y recuperación de contraseña
+
+- **Sin registro abierto**: quien pide una cuenta deja RUT, nombre, correo, cargo y unidad; un administrador verifica y aprueba. Opcionalmente se exige correo institucional (`ECO_DOMINIO_CORREO`).
+- **Respuestas que no revelan información**: solicitar cuenta o recuperar clave muestra siempre el mismo mensaje, exista o no el RUT. Los pedidos de clave de RUT inexistentes no se guardan (solo un registro enmascarado en la bitácora).
+- **Límite por IP** en ambos formularios públicos para frenar abusos.
+- **Contraseña temporal visible una sola vez**, entregada en persona tras verificar identidad; se fuerza su cambio y se cierran las sesiones abiertas.
+- **Perfil DPD**: el Delegado de Protección de Datos responde las solicitudes de derechos, revisa módulos (evaluación de impacto) y la bitácora, sin acceso a la gestión de cuentas.
+- Cada acción administrativa queda en la bitácora con quién la hizo; consultar la bitácora también queda registrado.
+
 ## Privacidad por diseño para los módulos futuros
 
 Ningún módulo puede aparecer en el menú de puntos si:
@@ -45,5 +54,5 @@ Con esos campos se puede generar automáticamente el **Registro de Actividades d
 2. Servir por **HTTPS** (`ECO_COOKIE_SEGURA=1`) detrás del proxy institucional.
 3. Política de respaldo y retención de la bitácora; copia periódica del último hash fuera del servidor (sello de integridad).
 4. Procedimiento de reporte de vulneraciones a la Agencia de Protección de Datos y a la ANCI.
-5. Integrar el alta/baja de usuarios con el registro de personal (hoy es por consola).
+5. Integrar el alta/baja de usuarios con el registro de personal (hoy es manual desde el panel).
 6. Segundo factor (TOTP) para administradores.

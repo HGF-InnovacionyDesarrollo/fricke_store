@@ -58,6 +58,34 @@ CREATE TABLE IF NOT EXISTS solicitudes_derechos (
     respuesta TEXT
 );
 
+-- Solicitudes de cuenta hechas desde la pantalla de ingreso. Un administrador las aprueba.
+CREATE TABLE IF NOT EXISTS solicitudes_cuenta (
+    id INTEGER PRIMARY KEY,
+    rut TEXT NOT NULL,
+    nombre TEXT NOT NULL,
+    correo TEXT,
+    cargo TEXT,
+    unidad TEXT,
+    motivo TEXT,
+    estado TEXT NOT NULL DEFAULT 'pendiente',   -- pendiente | aprobada | rechazada
+    creada TEXT NOT NULL,
+    ip TEXT,
+    resuelta_por INTEGER REFERENCES usuarios(id),
+    resuelta_en TEXT,
+    nota TEXT
+);
+
+-- Pedidos de restablecimiento de contraseña (solo se guardan si el RUT existe).
+CREATE TABLE IF NOT EXISTS solicitudes_clave (
+    id INTEGER PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    estado TEXT NOT NULL DEFAULT 'pendiente',   -- pendiente | atendida | descartada
+    creada TEXT NOT NULL,
+    ip TEXT,
+    resuelta_por INTEGER REFERENCES usuarios(id),
+    resuelta_en TEXT
+);
+
 -- Catálogo de módulos del ecosistema (vacío por ahora). Se habilitan por rol o por usuario.
 CREATE TABLE IF NOT EXISTS modulos (
     id INTEGER PRIMARY KEY,

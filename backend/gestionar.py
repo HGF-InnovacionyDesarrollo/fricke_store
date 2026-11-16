@@ -37,6 +37,7 @@ def main():
     c.add_argument("--cargo")
     c.add_argument("--unidad")
     c.add_argument("--admin", action="store_true")
+    c.add_argument("--dpd", action="store_true", help="perfil Delegado de Protección de Datos")
     for nombre in ("restablecer", "desactivar", "desbloquear"):
         sub.add_parser(nombre).add_argument("--rut", required=True)
     sub.add_parser("listar")
@@ -51,7 +52,7 @@ def main():
                 sys.exit("Ya existe un usuario con ese RUT.")
             uid = db.execute(
                 "INSERT INTO usuarios (rut, nombre, correo, cargo, unidad, rol, clave_hash, creado_en) VALUES (?,?,?,?,?,?,?,?)",
-                (rut, a.nombre, a.correo, a.cargo, a.unidad, "admin" if a.admin else "funcionario", hash_clave(clave), ahora()),
+                (rut, a.nombre, a.correo, a.cargo, a.unidad, "admin" if a.admin else "dpd" if a.dpd else "funcionario", hash_clave(clave), ahora()),
             ).lastrowid
         auditar("usuario_creado", uid, "consola")
         print(f"Usuario creado: {formatear_rut(rut)} - {a.nombre}")

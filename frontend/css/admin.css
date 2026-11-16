@@ -1,0 +1,69 @@
+.cab-der { display: flex; align-items: center; gap: 8px; }
+.contenido.ancho { max-width: 1040px; }
+.admin .contenido h1 { text-align: left; margin: 8px 0 6px; }
+.admin .intro { text-align: left; margin: 0 0 20px; max-width: none; }
+.barra-seccion { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.btn svg { width: 18px; height: 18px; }
+.menu .contador { margin-left: auto; font-size: 12px; font-weight: 500; background: var(--primario); color: var(--primario-texto); border-radius: 10px; padding: 0 8px; line-height: 20px; }
+.menu .contador:empty { display: none; }
+.buscador { max-width: 480px; margin-bottom: 16px; }
+.buscador label { background: var(--fondo); }
+
+.metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.metrica { background: var(--superficie); border-radius: 16px; padding: 16px 18px; }
+.metrica span { display: block; font-size: 13px; color: var(--texto-2); }
+.metrica b { display: block; font-size: 28px; font-weight: 400; margin-top: 4px; }
+.metrica.alerta b { color: var(--peligro); }
+
+.tabla { border: 1px solid var(--borde); border-radius: 12px; overflow: hidden; }
+.tabla:empty { display: none; }
+.tfila { display: grid; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--borde-suave); font-size: 14px; }
+.tfila:first-child { border-top: 0; }
+.tfila.cab-tabla { background: var(--superficie); font-size: 12px; color: var(--texto-2); font-weight: 500; padding-top: 10px; padding-bottom: 10px; }
+.tfila small { display: block; color: var(--texto-3); font-size: 12.5px; overflow-wrap: anywhere; }
+.tfila .acciones-fila { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.tfila .btn { height: 32px; padding: 0 14px; font-size: 13px; }
+.t-usuarios { grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.4fr) auto; }
+.t-solicitudes { grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) minmax(0, 2fr) auto; }
+.t-claves { grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) minmax(0, 1.2fr) auto; }
+.t-derechos { grid-template-columns: minmax(0, 1.6fr) minmax(0, 2.4fr) minmax(0, 1fr) auto; }
+.t-modulos { grid-template-columns: 44px minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1.2fr) auto; }
+.t-bitacora { grid-template-columns: 150px minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 2fr) 110px; font-size: 13px; }
+.vacio-tabla { padding: 28px 18px; text-align: center; color: var(--texto-3); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 12px; line-height: 20px; padding: 0 9px; border-radius: 10px; background: var(--superficie); color: var(--texto-2); white-space: nowrap; }
+.chip.ok { background: #e3f4ea; color: #1e5631; }
+.chip.alerta { background: #fce8e6; color: #8c1d18; }
+.chip.info { background: var(--primario-suave); color: var(--texto); }
+.chip.acento { background: var(--acento-suave); color: var(--acento-texto); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chip.ok { background: #173b26; color: #a8e0bd; }
+  :root:not([data-theme="light"]) .chip.alerta { background: #4a1b18; color: #f6c1bc; }
+}
+
+.filtros { display: inline-flex; border: 1px solid var(--borde); border-radius: 20px; overflow: hidden; margin-bottom: 16px; }
+.filtros button { border: 0; background: none; padding: 7px 16px; cursor: pointer; font-size: 13px; color: var(--texto-2); }
+.filtros button + button { border-left: 1px solid var(--borde); }
+.filtros button.activo { background: var(--primario-suave); color: var(--texto); font-weight: 500; }
+
+.mod-icono { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: #fff; }
+.mod-icono svg { width: 20px; height: 20px; }
+
+/* clave temporal */
+.clave-temporal { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--superficie); border-radius: 12px; padding: 14px 18px; margin: 12px 0 16px; }
+.clave-temporal code { font: 500 24px/1.2 Consolas, "Roboto Mono", monospace; letter-spacing: .06em; }
+.dlg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.dlg-grid .ancho { grid-column: 1 / -1; }
+.dlg-acciones-extra { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid var(--borde-suave); }
+.dialogo.amplio { width: min(720px, 100%); }
+.check-lista { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 18px; }
+.subtitulo { font-size: 13px; font-weight: 500; color: var(--texto-2); margin: 4px 0 10px; }
+
+@media (max-width: 860px) {
+  .tfila { grid-template-columns: 1fr !important; gap: 6px; }
+  .tfila.cab-tabla { display: none; }
+  .tfila .acciones-fila { justify-content: flex-start; }
+  .dlg-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) { .cab-der .btn-texto { display: none; } .marca-sub { font-size: 16px; } }

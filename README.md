@@ -17,6 +17,12 @@ Por ahora no tiene módulos: se irán agregando de a poco (ver *Agregar un módu
 - **Mi cuenta**, al estilo de la cuenta de Google: datos personales, sesiones abiertas con cierre remoto,
   actividad reciente, descarga de mis datos y solicitudes de derechos (Ley 21.719).
 - **Bitácora inalterable**: cada registro está encadenado con SHA-256 al anterior.
+- **Solicitar una cuenta** desde el login: la persona deja sus datos y un administrador la aprueba.
+- **Recuperar contraseña**: el pedido llega al panel; la Mesa de ayuda verifica identidad y entrega una clave temporal.
+- **Panel de administración** (`/admin`, desde la tarjeta de cuenta): resumen, usuarios (crear, editar, perfil,
+  restablecer, desbloquear, desactivar, cerrar sesiones), solicitudes de cuenta, pedidos de contraseña,
+  derechos Ley 21.719 con plazos, módulos con su ficha de tratamiento y bitácora con verificación de integridad.
+- **Perfiles**: funcionario, administrador y Delegado de Protección de Datos (DPD: derechos, módulos y bitácora).
 
 El detalle normativo está en [docs/CUMPLIMIENTO.md](docs/CUMPLIMIENTO.md).
 
@@ -30,6 +36,14 @@ python -m uvicorn app:app --app-dir backend --port 8090
 
 Abrir http://localhost:8090 e ingresar con el RUT y la clave temporal que imprime el comando `crear`.
 En Windows también sirve `iniciar.bat`.
+
+## Cómo se crean las cuentas
+
+1. La persona pulsa **Solicitar una cuenta** en el login, o un administrador la crea en **Administración › Usuarios**.
+2. El administrador aprueba y el sistema muestra una **contraseña temporal una sola vez**.
+3. Se entrega en persona; al primer ingreso se exige crear una contraseña propia y leer el aviso de privacidad.
+
+No hay registro abierto ni envío de claves por correo: en un hospital la identidad se verifica antes de dar acceso.
 
 ## Administración (consola)
 
@@ -45,19 +59,20 @@ python backend/gestionar.py verificar-auditoria
 ## Configuración
 
 Variables de entorno (ver `backend/config.py`): `ECO_INSTITUCION`, `ECO_PRODUCTO` (palabra del logotipo),
-`ECO_CORREO_DPD`, `ECO_MESA_AYUDA`, `ECO_INACTIVIDAD_MIN`, `ECO_SESION_MAX_H`, `ECO_COOKIE_SEGURA=1` (con HTTPS), `ECO_VERSION_AVISO`.
+`ECO_CORREO_DPD`, `ECO_MESA_AYUDA`, `ECO_INACTIVIDAD_MIN`, `ECO_SESION_MAX_H`, `ECO_COOKIE_SEGURA=1` (con HTTPS), `ECO_VERSION_AVISO`,
+`ECO_DOMINIO_CORREO` (exige correo institucional en las solicitudes), `ECO_LIMITE_PUBLICO` y `ECO_VENTANA_PUBLICO_MIN` (límite de solicitudes por IP).
 
 ## Agregar un módulo
 
-Insertar una fila en `modulos` con su **finalidad** y **categorías de datos** (obligatorias) y habilitarlo por rol
-(`modulos_rol`) o por persona (`modulos_usuario`). Si trata datos de salud, marcar `datos_sensibles=1`: no aparecerá en
-el menú hasta que el DPD apruebe su evaluación de impacto (`eipd_aprobada=1`).
+En **Administración › Módulos › Agregar módulo**: nombre, dirección, ícono, color, perfiles que lo ven y su
+**ficha de tratamiento** (finalidad y categorías de datos, obligatorias). Si trata datos de salud, marcar
+*datos sensibles*: no aparecerá en el menú hasta que se marque la evaluación de impacto como aprobada.
 
 ## Estructura
 
 ```
-backend/   app.py (API y páginas) · db.py (esquema y bitácora) · seguridad.py (RUT, scrypt, tokens) · gestionar.py · config.py
-frontend/  index.html (portada) · login.html · cuenta.html · privacidad.html · css/ · js/ · img/
+backend/   app.py (API y páginas) · gestion.py (solicitudes y administración) · db.py (esquema y bitácora) · seguridad.py (RUT, scrypt, tokens) · gestionar.py · config.py
+frontend/  index.html (portada) · login.html · cuenta.html · admin.html · privacidad.html · css/ · js/ · img/
 docs/      CUMPLIMIENTO.md · HOJA_DE_RUTA.md
 data/      ecosistema.db (no se versiona)
 ```

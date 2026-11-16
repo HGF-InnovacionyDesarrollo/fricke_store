@@ -42,3 +42,12 @@ body.login { display: flex; flex-direction: column; align-items: center; justify
   .lado-izq { display: contents; }
   .logo-chico, .lado-izq h1, .sub { order: -1; }
 }
+.fila-clave { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 8px; }
+.fila-clave .check { margin: 0; }
+.enlace { background: none; border: 0; padding: 4px 0; color: var(--primario); font-weight: 500; cursor: pointer; font-size: 14px; }
+.enlace:hover { text-decoration: underline; }
+.acciones { justify-content: space-between; }
+.dlg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.dlg-grid .ancho { grid-column: 1 / -1; }
+@media (max-width: 520px) { .dlg-grid { grid-template-columns: 1fr; } }
+.dlg-texto { margin: 0 0 20px; color: var(--texto-2); }

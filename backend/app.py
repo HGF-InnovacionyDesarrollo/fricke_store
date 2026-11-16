@@ -260,10 +260,13 @@ def yo(request: Request):
         return {"bloqueada": True, "nombre": ctx.u["nombre"]}
     return {
         "bloqueada": False,
+        "id": ctx.u["id"],
         **_datos_publicos(ctx.u),
         "debe_cambiar_clave": bool(ctx.u["debe_cambiar_clave"]),
         "debe_aceptar_aviso": not _acepto_aviso(ctx.u["id"]),
         "inactividad_min": cfg.SESION_INACTIVIDAD_MIN,
+        "rol_nombre": cfg.ROLES.get(ctx.u["rol"], ctx.u["rol"]),
+        "puede_administrar": ctx.u["rol"] in ("admin", "dpd"),
     }
 
 
@@ -321,6 +324,20 @@ ETIQUETAS_ACCION = {
     "solicitud_derecho": "Solicitud de derechos enviada",
     "sesion_cerrada_remota": "Sesión cerrada desde Mi cuenta",
     "asistente_consulta": "Consulta al asistente",
+    "usuario_creado": "Cuenta creada",
+    "usuario_editado": "Datos de la cuenta modificados",
+    "usuario_desbloqueado": "Cuenta desbloqueada por un administrador",
+    "clave_restablecida": "Contraseña restablecida por un administrador",
+    "sesiones_cerradas_admin": "Sesiones cerradas por un administrador",
+    "solicitud_clave": "Pedido de nueva contraseña",
+    "solicitud_cuenta": "Solicitud de cuenta",
+    "solicitud_cuenta_rechazada": "Solicitud de cuenta rechazada",
+    "solicitud_clave_descartada": "Pedido de contraseña descartado",
+    "solicitud_derecho_en_revision": "Solicitud de derechos en revisión",
+    "solicitud_derecho_respondida": "Solicitud de derechos respondida",
+    "solicitud_derecho_rechazada": "Solicitud de derechos rechazada",
+    "modulo_guardado": "Módulo guardado",
+    "auditoria_consultada": "Bitácora consultada",
 }
 
 
@@ -399,12 +416,11 @@ def mis_solicitudes(ctx: Contexto = Depends(sesion_lista)):
     return [{**dict(f), "tipo_nombre": TIPOS_SOLICITUD[f["tipo"]]} for f in filas]
 
 
-# ------------------------------------------------------------------ administración
-@app.get("/api/admin/auditoria/verificar")
-def admin_verificar(ctx: Contexto = Depends(sesion_lista)):
-    if ctx.u["rol"] != "admin":
-        raise HTTPException(403, "Solo administradores.")
-    return verificar_auditoria()
+# ------------------------------------------------------------------ administración y solicitudes públicas
+# Se importa aquí porque gestion.py usa la sesión y los helpers definidos arriba.
+from gestion import router as router_gestion  # noqa: E402
+
+app.include_router(router_gestion)
 
 
 # ------------------------------------------------------------------ páginas
@@ -429,6 +445,13 @@ def pagina_cuenta(request: Request):
     if not request.cookies.get(cfg.COOKIE_NOMBRE):
         return RedirectResponse("/ingresar")
     return _pagina("cuenta.html")
+
+
+@app.get("/admin")
+def pagina_admin(request: Request):
+    if not request.cookies.get(cfg.COOKIE_NOMBRE):
+        return RedirectResponse("/ingresar")
+    return _pagina("admin.html")
 
 
 @app.get("/privacidad")

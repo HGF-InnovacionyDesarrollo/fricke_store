@@ -22,6 +22,19 @@ COOKIE_NOMBRE = "eco_sesion"
 MAX_INTENTOS = int(os.environ.get("ECO_MAX_INTENTOS", 5))
 BLOQUEO_MIN = int(os.environ.get("ECO_BLOQUEO_MIN", 15))
 
+# Solicitudes públicas (crear cuenta, recuperar clave): máximo por IP en la ventana indicada
+LIMITE_PUBLICO = int(os.environ.get("ECO_LIMITE_PUBLICO", 5))
+VENTANA_PUBLICO_MIN = int(os.environ.get("ECO_VENTANA_PUBLICO_MIN", 15))
+# Si se define (p. ej. "hospitalfricke.cl"), las solicitudes de cuenta exigen correo de ese dominio
+DOMINIO_CORREO = os.environ.get("ECO_DOMINIO_CORREO", "").strip().lower()
+
+# Perfiles de acceso
+ROLES = {
+    "funcionario": "Funcionario",
+    "admin": "Administrador",
+    "dpd": "Delegado de Protección de Datos",
+}
+
 # Contraseñas
 CLAVE_LARGO_MIN = 10
 

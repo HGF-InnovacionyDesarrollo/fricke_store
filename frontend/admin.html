@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administración</title>
+<link rel="icon" href="/static/img/icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/cuenta.css">
+<link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body class="cuenta admin">
+<header class="cab">
+  <a class="marca" href="/"><span class="logo" data-logo></span><span class="marca-sub">Administración</span></a>
+  <div class="cab-der">
+    <a class="btn btn-texto" href="/">Volver al inicio</a>
+    <span class="avatar" id="avatar"></span>
+  </div>
+</header>
+
+<div class="cuerpo">
+  <nav class="menu" aria-label="Secciones de administración" id="menu">
+    <a href="#resumen" data-sec="resumen"><span data-icono="inicio"></span>Resumen</a>
+    <a href="#usuarios" data-sec="usuarios" data-rol="admin"><span data-icono="persona"></span>Usuarios</a>
+    <a href="#solicitudes" data-sec="solicitudes" data-rol="admin"><span data-icono="documento"></span>Solicitudes de cuenta<b class="contador" data-cont="solicitudes_cuenta"></b></a>
+    <a href="#claves" data-sec="claves" data-rol="admin"><span data-icono="candado"></span>Contraseñas<b class="contador" data-cont="solicitudes_clave"></b></a>
+    <a href="#derechos" data-sec="derechos"><span data-icono="escudo"></span>Derechos Ley 21.719<b class="contador" data-cont="derechos_pendientes"></b></a>
+    <a href="#modulos" data-sec="modulos"><span data-icono="modulos"></span>Módulos</a>
+    <a href="#bitacora" data-sec="bitacora"><span data-icono="historial"></span>Bitácora</a>
+  </nav>
+
+  <main class="contenido ancho">
+    <section data-sec="resumen">
+      <h1>Resumen</h1>
+      <p class="intro">Estado del ecosistema y tareas pendientes.</p>
+      <div class="metricas" id="metricas"></div>
+      <div id="pendientes"></div>
+    </section>
+
+    <section data-sec="usuarios">
+      <div class="barra-seccion">
+        <h1>Usuarios</h1>
+        <button class="btn" id="btn-nuevo-usuario"><span data-icono="mas"></span>Crear cuenta</button>
+      </div>
+      <div class="campo buscador"><input id="buscar-usuario" placeholder=" " autocomplete="off"><label for="buscar-usuario">Buscar por nombre, RUT, unidad o cargo</label></div>
+      <div class="tabla" id="tabla-usuarios"></div>
+    </section>
+
+    <section data-sec="solicitudes">
+      <h1>Solicitudes de cuenta</h1>
+      <p class="intro">Personas que pidieron acceso desde la pantalla de ingreso. Verifica que trabajen en el hospital antes de aprobar.</p>
+      <div class="filtros" id="filtro-solicitudes">
+        <button data-estado="pendiente" class="activo">Pendientes</button><button data-estado="aprobada">Aprobadas</button><button data-estado="rechazada">Rechazadas</button>
+      </div>
+      <div class="tabla" id="tabla-solicitudes"></div>
+    </section>
+
+    <section data-sec="claves">
+      <h1>Pedidos de contraseña</h1>
+      <p class="intro">Antes de restablecer, verifica la identidad de la persona (cédula en mano o llamada verificada). La contraseña temporal se muestra una sola vez.</p>
+      <div class="tabla" id="tabla-claves"></div>
+    </section>
+
+    <section data-sec="derechos">
+      <h1>Derechos de los titulares</h1>
+      <p class="intro">Solicitudes de acceso, rectificación, supresión, oposición, portabilidad y bloqueo. Plazo legal: 30 días corridos.</p>
+      <div class="filtros" id="filtro-derechos">
+        <button data-estado="abiertas" class="activo">Abiertas</button><button data-estado="todas">Todas</button>
+      </div>
+      <div class="tabla" id="tabla-derechos"></div>
+    </section>
+
+    <section data-sec="modulos">
+      <div class="barra-seccion">
+        <h1>Módulos</h1>
+        <button class="btn" id="btn-nuevo-modulo" data-rol="admin"><span data-icono="mas"></span>Agregar módulo</button>
+      </div>
+      <p class="intro">Cada módulo declara su ficha de tratamiento. Si usa datos de salud, no aparece en el menú hasta que se apruebe su evaluación de impacto.</p>
+      <div class="tabla" id="tabla-modulos"></div>
+    </section>
+
+    <section data-sec="bitacora">
+      <div class="barra-seccion">
+        <h1>Bitácora</h1>
+        <button class="btn btn-borde" id="btn-integridad"><span data-icono="escudo"></span>Verificar integridad</button>
+      </div>
+      <div class="campo buscador"><input id="buscar-bitacora" placeholder=" " autocomplete="off"><label for="buscar-bitacora">Filtrar por persona, detalle o IP</label></div>
+      <div class="tabla" id="tabla-bitacora"></div>
+    </section>
+  </main>
+</div>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/admin.js"></script>
+</body>
+</html>

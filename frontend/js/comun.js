@@ -112,11 +112,11 @@ function navegadorLegible(ua) {
 }
 
 // ---------------------------------------------------------------- diálogos
-function dialogo({ titulo, html, acciones = [], cerrable = true }) {
+function dialogo({ titulo, html, acciones = [], cerrable = true, clase = "" }) {
   return new Promise((resolver) => {
     const velo = document.createElement("div");
     velo.className = "velo";
-    velo.innerHTML = `<div class="dialogo" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+    velo.innerHTML = `<div class="dialogo ${clase}" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
       <h2 id="dlg-t">${esc(titulo)}</h2><div class="dlg-cuerpo">${html}</div>
       <div class="acciones"></div></div>`;
     const cont = velo.querySelector(".acciones");
