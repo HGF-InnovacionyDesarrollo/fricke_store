@@ -7,7 +7,7 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 DB_PATH = Path(os.environ.get("ECO_DB", BASE_DIR / "data" / "ecosistema.db"))
 
 # Identidad de la institución (aparece en la portada, el aviso de privacidad y la cuenta)
-NOMBRE_INSTITUCION = os.environ.get("ECO_INSTITUCION", "Hospital")
+NOMBRE_INSTITUCION = os.environ.get("ECO_INSTITUCION", "Hospital Dr. Gustavo Fricke")
 NOMBRE_PRODUCTO = os.environ.get("ECO_PRODUCTO", "Ecosistema")
 CORREO_DPD = os.environ.get("ECO_CORREO_DPD", "protecciondedatos@hospital.cl")  # Delegado de Protección de Datos
 MESA_AYUDA = os.environ.get("ECO_MESA_AYUDA", "Anexo 0000 · Mesa de ayuda TI")

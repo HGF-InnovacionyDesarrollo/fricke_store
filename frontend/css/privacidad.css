@@ -10,3 +10,4 @@
 .indice { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 8px; }
 .indice a { font-size: 13px; padding: 6px 12px; border-radius: 16px; background: var(--superficie); color: var(--texto); }
 .indice a:hover { background: var(--primario-suave); text-decoration: none; }
+.doc-firma { width: 150px; margin: 56px auto 0; }
