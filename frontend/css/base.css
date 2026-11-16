@@ -171,6 +171,3 @@ svg { display: block; fill: currentColor; }
 .resumen-aviso b { color: var(--texto); font-weight: 500; }
 .resumen-aviso svg { width: 22px; height: 22px; flex: none; color: var(--primario); margin-top: 2px; }
 
-/* ---------- logo Innova Fricke (Unidad de Innovación y Desarrollo) ---------- */
-.logo-innova { display: block; }
-.logo-innova img { display: block; width: 100%; height: auto; }

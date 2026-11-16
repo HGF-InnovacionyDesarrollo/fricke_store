@@ -14,7 +14,6 @@ body.login { display: flex; flex-direction: column; align-items: center; justify
   margin-top: auto; padding-top: 32px; display: flex; align-items: center; gap: 14px;
   font-size: 12px; line-height: 1.4; color: var(--texto-3);
 }
-.credito .logo-innova { width: 56px; flex: none; }
 .credito b { font-weight: 500; color: var(--texto-2); }
 
 .lado-der { padding-top: 58px; }
