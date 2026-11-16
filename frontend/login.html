@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iniciar sesión</title>
+<link rel="icon" href="/static/img/icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body class="login">
+<main class="tarjeta-login">
+  <div class="lado-izq">
+    <div class="logo logo-chico" data-logo></div>
+    <h1>Inicia sesión</h1>
+    <p class="sub">con tu RUT para entrar a las soluciones de <span data-cfg="institucion"></span></p>
+  </div>
+  <form class="lado-der" id="form-login" novalidate>
+    <div class="aviso-suave oculto" id="aviso-expirada" role="status"><span data-icono="info"></span><span>Tu sesión se cerró por seguridad. Vuelve a ingresar.</span></div>
+    <div class="campo" id="campo-rut">
+      <input id="rut" name="rut" inputmode="text" autocomplete="username" placeholder=" " maxlength="12" required autofocus>
+      <label for="rut">RUT</label>
+      <div class="ayuda">Ej.: 12.345.678-5</div>
+    </div>
+    <div class="campo" id="campo-clave">
+      <input id="clave" name="clave" type="password" autocomplete="current-password" placeholder=" " required>
+      <label for="clave">Contraseña</label>
+    </div>
+    <label class="check"><input type="checkbox" id="ver-clave"> Mostrar contraseña</label>
+    <div class="zona-error" id="error-login"></div>
+    <p class="nota">¿Estás en un equipo compartido? Bloquea o cierra tu sesión al terminar. Tus accesos quedan registrados.</p>
+    <div class="acciones">
+      <button type="button" class="btn btn-texto" id="olvide">¿Olvidaste tu contraseña?</button>
+      <button class="btn" id="btn-ingresar">Siguiente</button>
+    </div>
+  </form>
+</main>
+<footer class="pie-login">
+  <span>Español (Chile)</span>
+  <nav><a href="/privacidad#contacto">Ayuda</a><a href="/privacidad">Privacidad</a><a href="/privacidad#acerca">Acerca de</a></nav>
+</footer>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/login.js"></script>
+</body>
+</html>

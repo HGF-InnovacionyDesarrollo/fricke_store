@@ -1,0 +1,27 @@
+body.login { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px 16px 0; background: var(--superficie); }
+.tarjeta-login {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: min(1040px, 100%);
+  background: var(--tarjeta); border-radius: 28px; padding: 36px;
+}
+.logo-chico { font-size: 34px; margin-bottom: 26px; }
+.lado-izq h1 { font-size: 36px; font-weight: 400; margin: 0 0 14px; line-height: 1.2; }
+.sub { font-size: 16px; color: var(--texto-2); margin: 0; }
+.lado-der { padding-top: 64px; }
+.lado-der .campo label { background: var(--tarjeta); }
+.lado-der .check { margin: -4px 0 8px; }
+.lado-der .zona-error { min-height: 4px; margin-bottom: 8px; }
+.lado-der .error-txt { font-size: 14px; }
+.nota { font-size: 13px; color: var(--texto-2); margin: 16px 0 32px; }
+.acciones { display: flex; justify-content: flex-end; gap: 8px; align-items: center; flex-wrap: wrap; }
+#aviso-expirada { margin-bottom: 20px; }
+.pie-login { display: flex; justify-content: space-between; width: min(1040px, 100%); padding: 12px 10px 24px; font-size: 12px; color: var(--texto-2); }
+.pie-login nav { display: flex; gap: 6px; }
+.pie-login a { color: var(--texto-2); padding: 6px 10px; border-radius: 4px; }
+.pie-login a:hover { background: var(--hover); text-decoration: none; }
+
+@media (max-width: 760px) {
+  body.login { background: var(--tarjeta); justify-content: flex-start; padding-top: 8px; }
+  .tarjeta-login { grid-template-columns: 1fr; padding: 24px 8px; gap: 8px; }
+  .lado-izq h1 { font-size: 28px; }
+  .lado-der { padding-top: 16px; }
+}

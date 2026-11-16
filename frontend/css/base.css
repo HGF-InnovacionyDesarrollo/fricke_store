@@ -1,0 +1,174 @@
+/* Ecosistema hospitalario — estilo inspirado en las superficies de Google,
+   con la paleta del Kit Digital del Gobierno de Chile en los acentos. */
+:root {
+  --fondo: #ffffff;
+  --superficie: #f0f4f9;          /* paneles flotantes (launcher, cuenta) */
+  --tarjeta: #ffffff;
+  --texto: #1f1f1f;
+  --texto-2: #444746;
+  --texto-3: #747775;
+  --borde: #dadce0;
+  --borde-suave: #e8eaed;
+  --hover: rgba(68, 71, 70, .08);
+  --primario: #0b57d0;
+  --primario-texto: #ffffff;
+  --primario-suave: #d3e3fd;
+  --peligro: #b3261e;
+  --ok: #146c2e;
+  --pie: #f2f2f2;
+  --sombra-barra: 0 1px 6px rgba(32, 33, 36, .28);
+  --sombra-pop: 0 4px 8px 3px rgba(60, 64, 67, .15), 0 1px 3px rgba(60, 64, 67, .3);
+  /* letras del logotipo */
+  --l1: #0f69c4; --l2: #e22c2c; --l3: #f5a400; --l4: #0f69c4; --l5: #2e8540; --l6: #e22c2c;
+  --radio-pop: 28px;
+  --fuente: "Google Sans", Roboto, "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fondo: #1f1f1f; --superficie: #282a2c; --tarjeta: #1b1b1b;
+    --texto: #e3e3e3; --texto-2: #c4c7c5; --texto-3: #8e918f;
+    --borde: #5f6368; --borde-suave: #3c4043; --hover: rgba(227, 227, 227, .08);
+    --primario: #a8c7fa; --primario-texto: #062e6f; --primario-suave: #0842a0;
+    --peligro: #f2b8b5; --ok: #6dd58c; --pie: #171717;
+    --sombra-barra: 0 1px 6px rgba(0, 0, 0, .6); --sombra-pop: 0 4px 12px rgba(0, 0, 0, .6);
+    --l1: #6ea8ff; --l2: #ff7b72; --l3: #ffc94a; --l4: #6ea8ff; --l5: #6dd58c; --l6: #ff7b72;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fondo: #1f1f1f; --superficie: #282a2c; --tarjeta: #1b1b1b;
+  --texto: #e3e3e3; --texto-2: #c4c7c5; --texto-3: #8e918f;
+  --borde: #5f6368; --borde-suave: #3c4043; --hover: rgba(227, 227, 227, .08);
+  --primario: #a8c7fa; --primario-texto: #062e6f; --primario-suave: #0842a0;
+  --peligro: #f2b8b5; --ok: #6dd58c; --pie: #171717;
+  --sombra-barra: 0 1px 6px rgba(0, 0, 0, .6); --sombra-pop: 0 4px 12px rgba(0, 0, 0, .6);
+  --l1: #6ea8ff; --l2: #ff7b72; --l3: #ffc94a; --l4: #6ea8ff; --l5: #6dd58c; --l6: #ff7b72;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--fondo); color: var(--texto);
+  font: 14px/1.45 var(--fuente); -webkit-font-smoothing: antialiased;
+}
+a { color: var(--primario); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; color: inherit; }
+svg { display: block; fill: currentColor; }
+.oculto { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; }
+
+/* ---------- logotipo ---------- */
+.logo { font-weight: 500; letter-spacing: -.02em; user-select: none; line-height: 1; }
+.logo span:nth-child(6n+1) { color: var(--l1); }
+.logo span:nth-child(6n+2) { color: var(--l2); }
+.logo span:nth-child(6n+3) { color: var(--l3); }
+.logo span:nth-child(6n+4) { color: var(--l4); }
+.logo span:nth-child(6n+5) { color: var(--l5); }
+.logo span:nth-child(6n+6) { color: var(--l6); }
+
+/* ---------- botones ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 24px; border-radius: 20px; border: 0; cursor: pointer;
+  background: var(--primario); color: var(--primario-texto); font-weight: 500;
+}
+.btn:hover { box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
+.btn:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.btn-texto { background: none; color: var(--primario); padding: 0 12px; }
+.btn-texto:hover { background: var(--hover); box-shadow: none; }
+.btn-borde { background: none; color: var(--primario); border: 1px solid var(--borde); }
+.btn-borde:hover { background: var(--hover); box-shadow: none; }
+.btn-icono {
+  width: 40px; height: 40px; border-radius: 50%; border: 0; background: none; cursor: pointer;
+  display: inline-grid; place-items: center; color: var(--texto-2);
+}
+.btn-icono:hover { background: var(--hover); }
+.btn-icono svg { width: 24px; height: 24px; }
+
+/* ---------- campos con etiqueta flotante (estilo cuentas Google) ---------- */
+.campo { position: relative; margin: 0 0 20px; }
+.campo input, .campo select, .campo textarea {
+  width: 100%; height: 56px; padding: 16px 15px 0; border: 1px solid var(--borde); border-radius: 4px;
+  background: transparent; color: var(--texto); font: 16px var(--fuente); outline: none;
+}
+.campo textarea { height: 110px; padding-top: 24px; resize: vertical; }
+.campo select { padding-top: 18px; }
+.campo label {
+  position: absolute; left: 12px; top: 18px; padding: 0 4px; color: var(--texto-3); font-size: 16px;
+  pointer-events: none; transition: all .15s; background: var(--tarjeta);
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus { border: 2px solid var(--primario); padding-left: 14px; }
+.campo input:focus + label, .campo input:not(:placeholder-shown) + label,
+.campo textarea:focus + label, .campo textarea:not(:placeholder-shown) + label,
+.campo select + label { top: -8px; font-size: 12px; }
+.campo input:focus + label, .campo textarea:focus + label { color: var(--primario); }
+.campo .ayuda { font-size: 12px; color: var(--texto-3); margin: 4px 16px 0; }
+.campo.error input { border-color: var(--peligro); }
+.campo.error label, .campo .error-txt { color: var(--peligro); }
+.error-txt { font-size: 12px; margin: 6px 4px 0; display: flex; gap: 6px; align-items: flex-start; }
+.error-txt svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.check { display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--texto-2); }
+.check input { width: 18px; height: 18px; accent-color: var(--primario); }
+
+/* ---------- paneles flotantes ---------- */
+.pop {
+  position: absolute; z-index: 50; background: var(--superficie); border-radius: var(--radio-pop);
+  box-shadow: var(--sombra-pop); overflow: auto; max-height: calc(100vh - 80px);
+  animation: aparecer .12s ease-out;
+}
+@keyframes aparecer { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+
+/* ---------- diálogos ---------- */
+.velo {
+  position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, .4);
+  display: grid; place-items: center; padding: 16px;
+}
+.dialogo {
+  background: var(--tarjeta); color: var(--texto); border-radius: 28px; padding: 24px;
+  width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-shadow: var(--sombra-pop);
+}
+.dialogo h2 { font-size: 24px; font-weight: 400; margin: 0 0 16px; }
+.dialogo .acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+.dialogo .campo label { background: var(--tarjeta); }
+
+/* ---------- avisos ---------- */
+.aviso-suave {
+  display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--texto-2);
+  background: var(--superficie); border-radius: 12px; padding: 12px 14px;
+}
+.aviso-suave svg { width: 18px; height: 18px; flex: none; color: var(--primario); margin-top: 1px; }
+.toast {
+  position: fixed; left: 24px; bottom: 24px; z-index: 200; background: #303030; color: #f2f2f2;
+  padding: 14px 16px; border-radius: 8px; box-shadow: var(--sombra-pop); max-width: calc(100vw - 48px);
+  display: flex; gap: 16px; align-items: center;
+}
+.toast button { background: none; border: 0; color: #a8c7fa; font-weight: 500; cursor: pointer; }
+
+/* ---------- avatar ---------- */
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: #5e35b1; color: #fff; font-weight: 500; font-size: 16px; user-select: none;
+}
+.avatar.grande { width: 80px; height: 80px; font-size: 36px; }
+
+/* ---------- pantalla bloqueada ---------- */
+.bloqueo {
+  position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 16px;
+  background: color-mix(in srgb, var(--fondo) 70%, transparent); backdrop-filter: blur(18px);
+}
+.bloqueo .caja { text-align: center; width: min(360px, 100%); }
+.bloqueo .avatar { margin: 0 auto 16px; }
+.bloqueo h2 { font-weight: 400; font-size: 24px; margin: 0 0 4px; }
+.bloqueo p { color: var(--texto-2); margin: 0 0 24px; }
+.bloqueo .campo label { background: var(--fondo); }
+.bloqueo .fila { display: flex; justify-content: space-between; align-items: center; }
+
+/* ---------- resumen del aviso de privacidad (diálogo de primer ingreso) ---------- */
+.resumen-aviso { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.resumen-aviso li { display: flex; gap: 14px; font-size: 14px; color: var(--texto-2); }
+.resumen-aviso b { color: var(--texto); font-weight: 500; }
+.resumen-aviso svg { width: 22px; height: 22px; flex: none; color: var(--primario); margin-top: 2px; }

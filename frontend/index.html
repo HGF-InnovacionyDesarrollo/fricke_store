@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecosistema</title>
+<link rel="icon" href="/static/img/icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/inicio.css">
+</head>
+<body class="inicio">
+<a class="sr" href="#pregunta">Saltar al asistente</a>
+
+<header class="barra-sup">
+  <nav class="enlaces-sup" aria-label="Accesos">
+    <a href="/cuenta">Mi cuenta</a>
+    <a href="/privacidad">Privacidad</a>
+  </nav>
+  <button class="btn-icono" id="btn-apps" aria-label="Módulos del ecosistema" aria-haspopup="true" aria-expanded="false" title="Módulos del ecosistema"><span data-icono="apps"></span></button>
+  <button class="btn-avatar" id="btn-cuenta" aria-label="Tu cuenta" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="avatar-sup"></span></button>
+</header>
+
+<main class="portada" id="portada">
+  <h1 class="logo logo-portada" data-logo></h1>
+  <p class="institucion" data-cfg="institucion"></p>
+
+  <form class="barra-busqueda" id="form-pregunta" role="search">
+    <button type="button" class="btn-icono chico" title="Adjuntar documento (próximamente)" aria-label="Adjuntar documento (próximamente)" disabled><span data-icono="mas"></span></button>
+    <label for="pregunta" class="sr">Pregúntale al asistente</label>
+    <input id="pregunta" name="pregunta" type="text" autocomplete="off" maxlength="2000" placeholder="Pregúntale al asistente del hospital">
+    <button type="button" class="btn-icono chico" title="Dictado por voz (próximamente)" aria-label="Dictado por voz (próximamente)" disabled><span data-icono="mic"></span></button>
+    <button type="submit" class="chip-ia"><span data-icono="chispa"></span>Asistente IA</button>
+  </form>
+
+  <div class="sugerencias">
+    <button class="sugerencia" data-texto="¿Cuál es el protocolo vigente de prevención de caídas?">
+      <span data-icono="documento"></span><span><b>Buscar un protocolo</b><small>Normas, guías y procedimientos</small></span>
+    </button>
+    <button class="sugerencia" data-texto="Resume los puntos clave del último instructivo de mi unidad">
+      <span data-icono="chispa"></span><span><b>Resumir un documento</b><small>Instructivos y circulares</small></span>
+    </button>
+  </div>
+
+  <p class="nota-privacidad"><span data-icono="escudo"></span>No escribas nombres, RUT ni otros datos que identifiquen a pacientes. Las preguntas no se guardan.</p>
+</main>
+
+<!-- Vista de conversación (maqueta) -->
+<section class="chat oculto" id="chat" aria-live="polite">
+  <div class="chat-hilo" id="chat-hilo"></div>
+  <form class="barra-busqueda chat-barra" id="form-chat">
+    <label for="pregunta-chat" class="sr">Escribe otra pregunta</label>
+    <input id="pregunta-chat" type="text" autocomplete="off" maxlength="2000" placeholder="Escribe otra pregunta">
+    <button class="btn-icono chico" aria-label="Enviar"><span data-icono="enviar"></span></button>
+  </form>
+  <p class="nota-privacidad chica"><span data-icono="escudo"></span>El asistente puede equivocarse. No reemplaza el juicio clínico ni los documentos oficiales.</p>
+</section>
+
+<footer class="pie">
+  <div class="pie-fila"><span data-cfg="institucion"></span></div>
+  <div class="pie-fila pie-enlaces">
+    <div><a href="/privacidad#acerca">Acerca del ecosistema</a><a href="/cuenta#seguridad">Seguridad</a></div>
+    <div><a href="/privacidad">Privacidad</a><a href="/cuenta#privacidad">Tus derechos</a><a href="/privacidad#contacto">Ayuda</a></div>
+  </div>
+</footer>
+
+<!-- Launcher de módulos -->
+<div class="pop pop-apps oculto" id="pop-apps" role="dialog" aria-label="Módulos del ecosistema">
+  <div class="apps-tarjeta" id="apps-lista"></div>
+</div>
+
+<!-- Tarjeta de cuenta -->
+<div class="pop pop-cuenta oculto" id="pop-cuenta" role="dialog" aria-label="Tu cuenta">
+  <div class="cuenta-cab">
+    <span class="cuenta-rut" id="cuenta-rut"></span>
+    <button class="btn-icono" id="cerrar-cuenta" aria-label="Cerrar"><span data-icono="cerrar"></span></button>
+  </div>
+  <div class="cuenta-centro">
+    <span class="avatar grande" id="avatar-pop"></span>
+    <p class="cuenta-hola" id="cuenta-hola"></p>
+    <p class="cuenta-cargo" id="cuenta-cargo"></p>
+    <a class="btn btn-borde" href="/cuenta">Gestionar tu cuenta</a>
+  </div>
+  <div class="cuenta-acciones">
+    <button id="btn-bloquear"><span data-icono="candado"></span><span>Bloquear pantalla<small>Ctrl + Alt + L</small></span></button>
+    <button id="btn-salir"><span data-icono="salir"></span><span>Cerrar sesión</span></button>
+  </div>
+  <p class="cuenta-pie"><a href="/privacidad">Aviso de privacidad</a> · <a href="/cuenta#privacidad">Tus derechos</a></p>
+</div>
+
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/inicio.js"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi cuenta</title>
+<link rel="icon" href="/static/img/icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/cuenta.css">
+</head>
+<body class="cuenta">
+<header class="cab">
+  <a class="marca" href="/"><span class="logo" data-logo></span><span class="marca-sub">Cuenta</span></a>
+  <span class="avatar" id="avatar"></span>
+</header>
+
+<div class="cuerpo">
+  <nav class="menu" aria-label="Secciones de la cuenta">
+    <a href="#inicio" data-sec="inicio"><span data-icono="inicio"></span>Inicio</a>
+    <a href="#personal" data-sec="personal"><span data-icono="persona"></span>Información personal</a>
+    <a href="#seguridad" data-sec="seguridad"><span data-icono="candado"></span>Seguridad</a>
+    <a href="#privacidad" data-sec="privacidad"><span data-icono="privacidad"></span>Datos y privacidad</a>
+  </nav>
+
+  <main class="contenido">
+    <!-- INICIO -->
+    <section data-sec="inicio">
+      <div class="hero">
+        <span class="avatar grande" id="avatar-hero"></span>
+        <h1 id="hola"></h1>
+        <p>Administra tu acceso, tu seguridad y tus datos personales en el ecosistema del hospital.</p>
+      </div>
+      <div class="grilla-tarjetas">
+        <a class="tarjeta enlace" href="#seguridad"><div><h2>Seguridad</h2><p>Revisa tus sesiones abiertas y tu actividad reciente.</p></div><span data-icono="escudo" class="ilus"></span></a>
+        <a class="tarjeta enlace" href="#privacidad"><div><h2>Datos y privacidad</h2><p>Descarga tus datos o ejerce tus derechos según la Ley 21.719.</p></div><span data-icono="privacidad" class="ilus"></span></a>
+      </div>
+    </section>
+
+    <!-- INFORMACIÓN PERSONAL -->
+    <section data-sec="personal">
+      <h1>Información personal</h1>
+      <p class="intro">Estos son los datos que el ecosistema guarda sobre ti. Vienen del registro de personal del hospital.</p>
+      <div class="tarjeta lista">
+        <h2>Datos de identificación</h2>
+        <div class="fila"><span>RUT</span><b id="d-rut"></b></div>
+        <div class="fila"><span>Nombre</span><b id="d-nombre"></b></div>
+        <div class="fila"><span>Correo institucional</span><b id="d-correo"></b></div>
+        <div class="fila"><span>Cargo</span><b id="d-cargo"></b></div>
+        <div class="fila"><span>Unidad</span><b id="d-unidad"></b></div>
+        <div class="fila"><span>Perfil de acceso</span><b id="d-rol"></b></div>
+      </div>
+      <p class="intro chica">¿Algún dato está incorrecto? <a href="#privacidad" id="ir-rectificar">Solicita su rectificación</a>.</p>
+    </section>
+
+    <!-- SEGURIDAD -->
+    <section data-sec="seguridad">
+      <h1>Seguridad</h1>
+      <p class="intro">Configuración y actividad que te ayudan a mantener tu cuenta protegida.</p>
+      <div class="tarjeta lista">
+        <h2>Cómo ingresas</h2>
+        <button class="fila accion" id="btn-clave"><span data-icono="candado"></span><span>Contraseña<small>Cámbiala si crees que alguien más la conoce</small></span><span data-icono="flecha"></span></button>
+        <div class="fila"><span data-icono="historial"></span><span>Cierre automático<small id="txt-inactividad"></small></span></div>
+      </div>
+      <div class="tarjeta lista">
+        <h2>Tus sesiones abiertas</h2>
+        <div id="sesiones"></div>
+      </div>
+      <div class="tarjeta lista">
+        <h2>Actividad reciente</h2>
+        <p class="tarjeta-sub">Los últimos 50 eventos de tu cuenta. Este registro no se puede modificar.</p>
+        <div id="actividad"></div>
+      </div>
+    </section>
+
+    <!-- DATOS Y PRIVACIDAD -->
+    <section data-sec="privacidad">
+      <h1>Datos y privacidad</h1>
+      <p class="intro">Conforme a la Ley 21.719, tienes derecho a acceder, rectificar, suprimir, oponerte, pedir la portabilidad y el bloqueo de tus datos personales.</p>
+      <div class="tarjeta lista">
+        <h2>Tus datos</h2>
+        <a class="fila accion" href="/api/cuenta/exportar" id="btn-exportar"><span data-icono="descargar"></span><span>Descargar mis datos<small>Archivo JSON con todo lo que guardamos sobre ti (acceso y portabilidad)</small></span><span data-icono="flecha"></span></a>
+        <a class="fila accion" href="/privacidad" target="_blank" rel="noopener"><span data-icono="documento"></span><span>Aviso de privacidad<small id="txt-aviso"></small></span><span data-icono="flecha"></span></a>
+      </div>
+      <div class="tarjeta lista">
+        <h2>Ejercer un derecho</h2>
+        <p class="tarjeta-sub">Tu solicitud llega al Delegado de Protección de Datos. El plazo legal de respuesta es de 30 días corridos.</p>
+        <button class="fila accion" id="btn-solicitud"><span data-icono="escudo"></span><span>Nueva solicitud<small>Rectificación, supresión, oposición, bloqueo…</small></span><span data-icono="flecha"></span></button>
+        <div id="solicitudes"></div>
+      </div>
+      <div class="aviso-suave"><span data-icono="info"></span><span>Algunos registros, como la bitácora de accesos, deben conservarse por obligaciones legales de trazabilidad de la información clínica. En esos casos la supresión puede no proceder, pero siempre recibirás una respuesta fundada.</span></div>
+    </section>
+  </main>
+</div>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/cuenta.js"></script>
+</body>
+</html>

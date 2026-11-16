@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aviso de privacidad</title>
+<link rel="icon" href="/static/img/icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/privacidad.css">
+</head>
+<body>
+<header class="cab"><a href="/" class="logo" data-logo></a><span>Privacidad</span></header>
+<main class="doc">
+  <h1>Aviso de privacidad</h1>
+  <p class="meta">Versión <span data-cfg="version_aviso"></span> · Ecosistema digital de <span data-cfg="institucion"></span></p>
+
+  <div class="aviso-suave"><span data-icono="info"></span><span><b>Borrador técnico.</b> Este texto debe ser revisado y aprobado por el Delegado de Protección de Datos y la asesoría jurídica antes de su publicación oficial.</span></div>
+
+  <nav class="indice" aria-label="Contenido">
+    <a href="#responsable">1. Responsable</a><a href="#datos">2. Datos que tratamos</a><a href="#finalidad">3. Finalidad y base de licitud</a>
+    <a href="#conservacion">4. Conservación</a><a href="#seguridad">5. Seguridad</a><a href="#comunicacion">6. Comunicación a terceros</a>
+    <a href="#ia">7. Asistente de IA</a><a href="#derechos">8. Tus derechos</a><a href="#contacto">9. Contacto y reclamos</a><a href="#acerca">10. Acerca del ecosistema</a>
+  </nav>
+
+  <h2 id="responsable">1. Responsable del tratamiento</h2>
+  <p><span data-cfg="institucion"></span> es responsable de los datos personales tratados en este ecosistema, en el ejercicio de sus funciones públicas.
+    Puedes contactar a su Delegado de Protección de Datos en <b data-cfg="correo_dpd"></b>.</p>
+
+  <h2 id="datos">2. Datos que tratamos</h2>
+  <ul>
+    <li><b>Identificación laboral:</b> RUT, nombre, correo institucional, cargo, unidad y perfil de acceso.</li>
+    <li><b>Credenciales:</b> tu contraseña, guardada solo como un resumen criptográfico irreversible (nadie puede leerla, ni siquiera el equipo TI).</li>
+    <li><b>Registro de actividad:</b> fecha y hora de ingresos, salidas, bloqueos e intentos fallidos, dirección IP y tipo de navegador.</li>
+    <li><b>Solicitudes de derechos</b> que envíes desde Mi cuenta.</li>
+  </ul>
+  <p>El portal <b>no</b> trata datos de pacientes. Cada módulo que se incorpore y trate datos de salud tendrá su propio registro de tratamiento y evaluación de impacto.</p>
+
+  <h2 id="finalidad">3. Finalidad y base de licitud</h2>
+  <p>Usamos estos datos para: (a) autenticarte y darte acceso solo a los módulos que tu función requiere; (b) proteger la confidencialidad de la información clínica;
+    y (c) mantener la trazabilidad de los accesos exigida por la normativa sanitaria y de ciberseguridad. La base de licitud es el cumplimiento de funciones legales
+    del órgano público y de obligaciones legales, no tu consentimiento; por eso, al ingresar te pedimos que <i>leas</i> este aviso, no que lo "aceptes".</p>
+  <p>No usamos tus datos para publicidad, perfilamiento ni decisiones automatizadas que te afecten.</p>
+
+  <h2 id="conservacion">4. Plazo de conservación</h2>
+  <ul>
+    <li>Datos de la cuenta: mientras mantengas vínculo con la institución; luego se desactiva y se conserva solo lo necesario para auditoría.</li>
+    <li>Sesiones: se eliminan al cerrar sesión, tras <span data-cfg="inactividad_min"></span> minutos de inactividad o al terminar el turno.</li>
+    <li>Registro de actividad: por el plazo que fije la política institucional de auditoría (propuesta: 5 años).</li>
+  </ul>
+
+  <h2 id="seguridad">5. Medidas de seguridad</h2>
+  <ul>
+    <li>Contraseñas cifradas con <i>scrypt</i> y sal individual; bloqueo temporal tras intentos fallidos.</li>
+    <li>Cierre automático por inactividad y bloqueo de pantalla para equipos compartidos.</li>
+    <li>Bitácora encadenada criptográficamente: cualquier alteración o borrado es detectable.</li>
+    <li>Solo una cookie de sesión técnica, sin cookies de terceros, analítica ni rastreadores.</li>
+    <li>Acceso por perfil (mínimo privilegio): cada persona ve únicamente los módulos de su función.</li>
+  </ul>
+
+  <h2 id="comunicacion">6. Comunicación a terceros</h2>
+  <p>No cedemos tus datos a terceros. Solo podrían comunicarse a autoridades competentes cuando la ley lo exija. Los servidores operan dentro de la red del hospital.</p>
+
+  <h2 id="ia">7. Asistente de inteligencia artificial</h2>
+  <p>El asistente está en construcción. El texto de tus preguntas no se almacena; solo registramos que hiciste una consulta. No ingreses datos de pacientes.
+    Antes de habilitarlo se realizará una evaluación de impacto y se privilegiará un modelo que funcione dentro de la red institucional.</p>
+
+  <h2 id="derechos">8. Tus derechos</h2>
+  <p>Puedes ejercer tus derechos de <b>acceso, rectificación, supresión, oposición, portabilidad y bloqueo</b> en <a href="/cuenta#privacidad">Mi cuenta › Datos y privacidad</a>,
+    o escribiendo al Delegado de Protección de Datos. Responderemos dentro de 30 días corridos. Ejercerlos es gratuito.</p>
+
+  <h2 id="contacto">9. Contacto y reclamos</h2>
+  <p>Delegado de Protección de Datos: <b data-cfg="correo_dpd"></b>. Soporte técnico: <b data-cfg="mesa_ayuda"></b>.
+    Si no quedas conforme con la respuesta, puedes reclamar ante la Agencia de Protección de Datos Personales.</p>
+
+  <h2 id="acerca">10. Acerca del ecosistema</h2>
+  <p>El ecosistema reúne en un solo acceso las soluciones digitales del hospital. Los módulos se incorporan de forma gradual; cada uno declara qué datos usa y para qué.</p>
+</main>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/privacidad.js"></script>
+</body>
+</html>
