@@ -65,7 +65,7 @@ async function cargarConfig() {
   if (!CONFIG) CONFIG = await fetch("/api/config").then((r) => r.json());
   document.querySelectorAll("[data-cfg]").forEach((el) => { el.textContent = CONFIG[el.dataset.cfg] ?? ""; });
   document.querySelectorAll("[data-logo]").forEach((el) => {
-    el.innerHTML = [...CONFIG.producto].map((ch) => `<span>${esc(ch)}</span>`).join("");
+    el.innerHTML = CONFIG.producto.split(/\s+/).map((p) => `<span class="palabra">${esc(p)}</span>`).join(" ");
     el.setAttribute("aria-label", CONFIG.producto);
   });
   return CONFIG;
@@ -78,7 +78,7 @@ function iniciales(nombre) {
 
 // Color estable por persona, como los avatares de Google
 function colorAvatar(texto) {
-  const paleta = ["#5e35b1", "#1e88e5", "#00897b", "#e53935", "#f4511e", "#6d4c41", "#3949ab", "#8e24aa", "#039be5", "#43a047"];
+  const paleta = ["#1565c0", "#13806f", "#0d47a1", "#00796b", "#3949ab", "#2b3440", "#1976d2", "#00695c", "#455a64", "#5e35b1"];
   let h = 0; for (const c of texto || "") h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return paleta[h % paleta.length];
 }

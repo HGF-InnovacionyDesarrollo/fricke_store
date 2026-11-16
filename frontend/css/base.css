@@ -1,49 +1,50 @@
-/* Ecosistema hospitalario — estilo inspirado en las superficies de Google,
-   con la paleta del Kit Digital del Gobierno de Chile en los acentos. */
+/* Fricke Store — estructura inspirada en Google; paleta "Azul y menta":
+   azul clínico de primario y menta de acento. Contrastes WCAG AA verificados. */
 :root {
   --fondo: #ffffff;
-  --superficie: #f0f4f9;          /* paneles flotantes (launcher, cuenta) */
+  --superficie: #e7f0fb;          /* paneles flotantes (launcher, cuenta): azul muy suave */
   --tarjeta: #ffffff;
-  --texto: #1f1f1f;
-  --texto-2: #444746;
-  --texto-3: #747775;
-  --borde: #dadce0;
-  --borde-suave: #e8eaed;
-  --hover: rgba(68, 71, 70, .08);
-  --primario: #0b57d0;
+  --texto: #2b3440;
+  --texto-2: #4a5663;
+  --texto-3: #5f6b78;
+  --borde: #d6e4f5;
+  --borde-suave: #e6eef8;
+  --hover: rgba(21, 101, 192, .07);
+  --primario: #1565c0;            /* azul clínico (AA 5,8:1 sobre blanco) */
   --primario-texto: #ffffff;
-  --primario-suave: #d3e3fd;
-  --peligro: #b3261e;
-  --ok: #146c2e;
-  --pie: #f2f2f2;
-  --sombra-barra: 0 1px 6px rgba(32, 33, 36, .28);
-  --sombra-pop: 0 4px 8px 3px rgba(60, 64, 67, .15), 0 1px 3px rgba(60, 64, 67, .3);
-  /* letras del logotipo */
-  --l1: #0f69c4; --l2: #e22c2c; --l3: #f5a400; --l4: #0f69c4; --l5: #2e8540; --l6: #e22c2c;
+  --primario-suave: #d3e4f8;
+  --acento: #1fa58f;              /* menta: íconos, logotipo y detalles */
+  --acento-texto: #13806f;        /* menta para texto (AA 4,8:1) */
+  --acento-suave: #e0f5f0;
+  --peligro: #c62828;
+  --ok: #2e7d32;
+  --pie: #f3f7fc;
+  --sombra-barra: 0 1px 6px rgba(43, 52, 64, .24);
+  --sombra-pop: 0 4px 8px 3px rgba(43, 52, 64, .12), 0 1px 3px rgba(43, 52, 64, .28);
   --radio-pop: 28px;
   --fuente: "Google Sans", Roboto, "Segoe UI", Arial, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fondo: #1f1f1f; --superficie: #282a2c; --tarjeta: #1b1b1b;
-    --texto: #e3e3e3; --texto-2: #c4c7c5; --texto-3: #8e918f;
-    --borde: #5f6368; --borde-suave: #3c4043; --hover: rgba(227, 227, 227, .08);
-    --primario: #a8c7fa; --primario-texto: #062e6f; --primario-suave: #0842a0;
-    --peligro: #f2b8b5; --ok: #6dd58c; --pie: #171717;
+    --fondo: #141a22; --superficie: #1d2530; --tarjeta: #10151c;
+    --texto: #e6ecf3; --texto-2: #c3ccd6; --texto-3: #8d98a5;
+    --borde: #354352; --borde-suave: #26313d; --hover: rgba(130, 180, 245, .08);
+    --primario: #82b4f5; --primario-texto: #0b2f5c; --primario-suave: #17406f;
+    --acento: #5fd3bd; --acento-texto: #5fd3bd; --acento-suave: #123f39;
+    --peligro: #f2b8b5; --ok: #81c995; --pie: #0f141a;
     --sombra-barra: 0 1px 6px rgba(0, 0, 0, .6); --sombra-pop: 0 4px 12px rgba(0, 0, 0, .6);
-    --l1: #6ea8ff; --l2: #ff7b72; --l3: #ffc94a; --l4: #6ea8ff; --l5: #6dd58c; --l6: #ff7b72;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fondo: #1f1f1f; --superficie: #282a2c; --tarjeta: #1b1b1b;
-  --texto: #e3e3e3; --texto-2: #c4c7c5; --texto-3: #8e918f;
-  --borde: #5f6368; --borde-suave: #3c4043; --hover: rgba(227, 227, 227, .08);
-  --primario: #a8c7fa; --primario-texto: #062e6f; --primario-suave: #0842a0;
-  --peligro: #f2b8b5; --ok: #6dd58c; --pie: #171717;
+  --fondo: #141a22; --superficie: #1d2530; --tarjeta: #10151c;
+  --texto: #e6ecf3; --texto-2: #c3ccd6; --texto-3: #8d98a5;
+  --borde: #354352; --borde-suave: #26313d; --hover: rgba(130, 180, 245, .08);
+  --primario: #82b4f5; --primario-texto: #0b2f5c; --primario-suave: #17406f;
+  --acento: #5fd3bd; --acento-texto: #5fd3bd; --acento-suave: #123f39;
+  --peligro: #f2b8b5; --ok: #81c995; --pie: #0f141a;
   --sombra-barra: 0 1px 6px rgba(0, 0, 0, .6); --sombra-pop: 0 4px 12px rgba(0, 0, 0, .6);
-  --l1: #6ea8ff; --l2: #ff7b72; --l3: #ffc94a; --l4: #6ea8ff; --l5: #6dd58c; --l6: #ff7b72;
   color-scheme: dark;
 }
 
@@ -62,13 +63,10 @@ svg { display: block; fill: currentColor; }
 :focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; }
 
 /* ---------- logotipo ---------- */
-.logo { font-weight: 500; letter-spacing: -.02em; user-select: none; line-height: 1; }
-.logo span:nth-child(6n+1) { color: var(--l1); }
-.logo span:nth-child(6n+2) { color: var(--l2); }
-.logo span:nth-child(6n+3) { color: var(--l3); }
-.logo span:nth-child(6n+4) { color: var(--l4); }
-.logo span:nth-child(6n+5) { color: var(--l5); }
-.logo span:nth-child(6n+6) { color: var(--l6); }
+.logo { font-weight: 500; letter-spacing: -.02em; user-select: none; line-height: 1; white-space: pre; }
+/* logotipo de dos palabras: la primera en azul, la siguiente en menta */
+.logo .palabra { color: var(--primario); }
+.logo .palabra + .palabra { color: var(--acento); }
 
 /* ---------- botones ---------- */
 .btn {
@@ -151,7 +149,7 @@ svg { display: block; fill: currentColor; }
 /* ---------- avatar ---------- */
 .avatar {
   width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
-  background: #5e35b1; color: #fff; font-weight: 500; font-size: 16px; user-select: none;
+  background: var(--primario); color: #fff; font-weight: 500; font-size: 16px; user-select: none;
 }
 .avatar.grande { width: 80px; height: 80px; font-size: 36px; }
 

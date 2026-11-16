@@ -1,4 +1,4 @@
-# Ecosistema hospitalario
+# Fricke Store — ecosistema digital del Hospital Dr. Gustavo Fricke
 
 Portal de acceso único a las soluciones digitales del hospital, con el modelo visual de Google:
 portada con un buscador (que será el **asistente de IA**, hoy maqueteado), **menú de puntos** con los módulos

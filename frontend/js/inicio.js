@@ -55,7 +55,7 @@
     } else {
       lista.innerHTML = `<div class="apps-grilla">${mods.map((m) => `
         <a class="app" href="${esc(m.url)}" title="${esc(m.descripcion || m.nombre)}">
-          <span class="app-icono" style="background:${esc(m.color || "#0b57d0")}">${icono(m.icono) || esc(m.nombre[0])}</span>
+          <span class="app-icono" style="background:${esc(m.color || "#1565c0")}">${icono(m.icono) || esc(m.nombre[0])}</span>
           <span>${esc(m.nombre)}</span></a>`).join("")}</div>`;
     }
   } catch (_) {
