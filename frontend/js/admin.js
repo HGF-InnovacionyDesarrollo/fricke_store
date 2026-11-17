@@ -496,6 +496,21 @@ document.addEventListener("click", (e) => {
   let tBit;
   $("#buscar-bitacora").addEventListener("input", () => { clearTimeout(tBit); tBit = setTimeout(cargarBitacora, 300); });
   ["#desde-bitacora", "#hasta-bitacora"].forEach((id) => $(id).addEventListener("change", cargarBitacora));
+  $("#exportar-bitacora").onclick = async () => {
+    const b = $("#exportar-bitacora");
+    const p = new URLSearchParams({ q: $("#buscar-bitacora").value, desde: $("#desde-bitacora").value, hasta: $("#hasta-bitacora").value });
+    b.disabled = true;
+    try {
+      const r = await fetch(`/api/admin/auditoria/exportar?${p}`, { credentials: "same-origin" });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || "No se pudo exportar."); }
+      const nombre = (r.headers.get("content-disposition") || "").match(/filename="([^"]+)"/)?.[1] || "bitacora.csv";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(await r.blob()); a.download = nombre; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast("Bitácora exportada. La descarga quedó registrada.");
+    } catch (e) { toast(e.message); }
+    finally { b.disabled = false; }
+  };
   $("#limpiar-bitacora").onclick = () => { $("#desde-bitacora").value = ""; $("#hasta-bitacora").value = ""; cargarBitacora(); };
   $("#btn-integridad").onclick = async () => {
     const r = await api("/api/admin/auditoria/integridad");

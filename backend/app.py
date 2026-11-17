@@ -359,6 +359,7 @@ ETIQUETAS_ACCION = {
     "solicitud_derecho_rechazada": "Solicitud de derechos rechazada",
     "modulo_guardado": "Módulo guardado",
     "auditoria_consultada": "Bitácora consultada",
+    "auditoria_exportada": "Bitácora exportada (CSV)",
     "solicitud_derecho_prorrogada": "Solicitud de derechos prorrogada",
     "incidente_registrado": "Incidente de seguridad registrado",
     "incidente_actualizado": "Incidente de seguridad actualizado",

@@ -14,6 +14,8 @@
 .filtros-bitacora .fecha input { padding-top: 18px; }
 .filtros-bitacora .fecha label { top: -8px; font-size: 12px; background: var(--fondo); }
 .filtros-bitacora .btn-texto { height: 56px; }
+.filtros-bitacora #exportar-bitacora { height: 56px; margin-left: auto; }
+.filtros-bitacora #exportar-bitacora svg { width: 20px; height: 20px; }
 .nota-bitacora { font-size: 12.5px; color: var(--texto-3); margin: 8px 0 12px; min-height: 1em; }
 
 .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }

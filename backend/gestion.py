@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict, deque
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 import config as cfg
@@ -511,7 +511,54 @@ def editar_modulo(mid: int, m: Modulo, ctx: Contexto = Depends(admin_o_dpd)):
 def ver_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "", limite: int = 200,
                   ctx: Contexto = Depends(auditoria_o_gestion)):
     """Bitácora con filtros. `desde` y `hasta` son fechas AAAA-MM-DD en hora de Chile, ambas incluidas."""
-    limite = max(1, min(limite, 1000))
+    filas = _consultar_auditoria(q, accion, desde, hasta, max(1, min(limite, 1000)))
+    auditar("auditoria_consultada", ctx.u["id"], _texto_filtro(q, accion, desde, hasta), ctx.ip)
+    return [_fila_bitacora(f) for f in filas]
+
+
+MAX_EXPORTAR = 50_000
+
+
+@router.get("/api/admin/auditoria/exportar")
+def exportar_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "",
+                       ctx: Contexto = Depends(auditoria_o_gestion)):
+    """Descarga en CSV (se abre en Excel) de lo filtrado. Incluye RUT e IP: la descarga queda en la bitácora."""
+    import csv
+    import io
+    from zoneinfo import ZoneInfo
+    filas = _consultar_auditoria(q, accion, desde, hasta, MAX_EXPORTAR)
+    chile = ZoneInfo("America/Santiago")
+
+    def celda(v):
+        v = "" if v is None else str(v)
+        return "'" + v if v[:1] in ("=", "+", "-", "@", "\t", "\r") else v  # evita fórmulas al abrir en Excel
+
+    salida = io.StringIO()
+    w = csv.writer(salida, delimiter=";", lineterminator="\r\n")  # ; es el separador de Excel en Chile
+    w.writerow(["N°", "Fecha (hora de Chile)", "Evento", "Código", "Persona", "RUT", "Detalle", "IP", "Hash"])
+    for f in filas:
+        d = _fila_bitacora(f)
+        fecha = datetime.fromisoformat(f["ts"]).astimezone(chile).strftime("%d-%m-%Y %H:%M:%S")
+        w.writerow([f["id"], fecha, *(celda(x) for x in (d["etiqueta"], f["accion"], f["nombre"], d["rut"], f["detalle"], f["ip"], f["hash"]))])
+    filtro = _texto_filtro(q, accion, desde, hasta)
+    auditar("auditoria_exportada", ctx.u["id"], f"{len(filas)} registros · {filtro}"[:200], ctx.ip)
+    nombre = f"bitacora_{cfg.ESTABLECIMIENTO}_{desde or 'inicio'}_{hasta or date.today().isoformat()}.csv"
+    # El BOM inicial hace que Excel reconozca las tildes.
+    return Response("\ufeff" + salida.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+def _texto_filtro(q, accion, desde, hasta) -> str:
+    t = " · ".join(x for x in (q, accion, f"desde {desde}" if desde else "", f"hasta {hasta}" if hasta else "") if x)
+    return (t or "sin filtro")[:120]
+
+
+def _fila_bitacora(f) -> dict:
+    return {**dict(f), "rut": formatear_rut(f["rut"]) if f["rut"] else None,
+            "etiqueta": ETIQUETAS_ACCION.get(f["accion"], f["accion"].replace("_", " ").capitalize())}
+
+
+def _consultar_auditoria(q: str, accion: str, desde: str, hasta: str, limite: int):
     for f in (desde, hasta):
         try:
             if f:
@@ -522,7 +569,7 @@ def ver_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "
         raise HTTPException(400, "La fecha «desde» no puede ser posterior a «hasta».")
     with bd() as c:
         filas = c.execute(
-            """SELECT a.id, a.ts, a.accion, a.detalle, a.ip, u.nombre, u.rut FROM auditoria a
+            """SELECT a.id, a.ts, a.accion, a.detalle, a.ip, a.hash, u.nombre, u.rut FROM auditoria a
                LEFT JOIN usuarios u ON u.id=a.usuario_id
                WHERE (?='' OR a.accion=?) AND (?='' OR u.nombre ILIKE ? OR a.detalle ILIKE ? OR a.ip ILIKE ?)
                  AND (?='' OR (a.ts::timestamptz AT TIME ZONE 'America/Santiago')::date >= ?::date)
@@ -530,10 +577,7 @@ def ver_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "
                ORDER BY a.id DESC LIMIT ?""",
             (accion, accion, q, f"%{q}%", f"%{q}%", f"%{q}%", desde, desde or None, hasta, hasta or None, limite),
         ).fetchall()
-    filtro = " · ".join(x for x in (q, accion, f"desde {desde}" if desde else "", f"hasta {hasta}" if hasta else "") if x)
-    auditar("auditoria_consultada", ctx.u["id"], (filtro or "sin filtro")[:120], ctx.ip)
-    return [{**dict(f), "rut": formatear_rut(f["rut"]) if f["rut"] else None,
-             "etiqueta": ETIQUETAS_ACCION.get(f["accion"], f["accion"].replace("_", " ").capitalize())} for f in filas]
+    return filas
 
 
 @router.get("/api/admin/auditoria/integridad")
