@@ -17,7 +17,8 @@ Instala:
 - [Git](https://git-scm.com/downloads)
 - [Python 3.12 o superior](https://www.python.org/downloads/) (marca "Add Python to PATH" al instalar)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para la base de datos de desarrollo)
-- Opcional: [Claude Code](https://claude.com/claude-code). El archivo `CLAUDE.md` del proyecto ya le indica las reglas.
+- Opcional: [Claude Code](https://claude.com/claude-code). Dentro del proyecto, escribe `/nuevo-modulo` (o simplemente
+  pide "haz un módulo de…"): Claude sigue paso a paso todas las directrices, corre las pruebas y prepara la entrega.
 
 Luego, en una terminal:
 
