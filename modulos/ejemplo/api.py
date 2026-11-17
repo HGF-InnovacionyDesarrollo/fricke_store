@@ -16,9 +16,12 @@ class NuevoAviso(BaseModel):
 
 
 @router.get("/avisos")
-def listar(ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.ver"))):
+def listar(mios: bool = False, ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.ver"))):
     with bd_modulo(CLAVE) as c:
-        filas = [dict(f) for f in c.execute("SELECT * FROM avisos ORDER BY id DESC LIMIT 100")]
+        if mios:
+            filas = [dict(f) for f in c.execute("SELECT * FROM avisos WHERE autor_id=? ORDER BY id DESC LIMIT 100", (ctx.usuario_id,))]
+        else:
+            filas = [dict(f) for f in c.execute("SELECT * FROM avisos ORDER BY id DESC LIMIT 100")]
     autores = nombres_de({f["autor_id"] for f in filas})
     for f in filas:
         f["autor"] = autores.get(f["autor_id"], "—")

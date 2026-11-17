@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 import config as cfg
 from db import ahora, aplicar_migraciones, auditar, bd
 from establecimiento import textos
+from logo_modulo import FAMILIAS, problemas_nombre, slug, verificar as verificar_logo
 
 CLAVE_VALIDA = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 ACCION_VALIDA = re.compile(r"[a-z][a-z0-9_]{2,60}")
@@ -56,8 +57,9 @@ class Manifiesto:
     version: str                        # semver: 0.1.0
     responsable: str                    # unidad dueña del módulo
     tratamiento: FichaTratamiento
-    icono: str = "modulos"              # uno de los íconos de frontend/js/comun.js
-    color: str = "#1565c0"
+    # Ícono según docs/diseno/: familia de color (1 a 5) y archivo en frontend/img/modulos/.
+    familia: int = 0                    # 1 Atención y acceso · 2 Clínica · 3 Calidad y seguridad · 4 Operaciones y equipos · 5 Personas y gestión
+    logo: str = ""                      # nombre del archivo sin .svg; por defecto, el nombre del módulo en minúsculas y con guiones
     orden: int = 100
     # Perfiles que lo ven en el menú la PRIMERA vez que se registra. Después lo administra el panel.
     perfiles_iniciales: tuple[str, ...] = ()
@@ -70,6 +72,18 @@ class Manifiesto:
     @property
     def url(self) -> str:
         return f"/m/{self.clave}/"
+
+    @property
+    def archivo_logo(self) -> str:
+        return self.logo or slug(self.nombre)
+
+    @property
+    def icono(self) -> str:
+        return f"/static/img/modulos/{self.archivo_logo}.svg"
+
+    @property
+    def color(self) -> str:
+        return FAMILIAS[self.familia][1] if self.familia in FAMILIAS else "#1565c0"
 
 
 @dataclass
@@ -101,8 +115,12 @@ def _validar(m: Manifiesto, carpeta: Path) -> list[str]:
         errores.append("la descripción no puede pasar de 200 caracteres.")
     if not re.fullmatch(r"\d+\.\d+\.\d+", m.version):
         errores.append("la versión debe ser semver (0.1.0).")
-    if not re.fullmatch(r"#[0-9a-fA-F]{6}", m.color):
-        errores.append("el color debe ser #RRGGBB.")
+    # Directrices de logos de módulos (docs/diseno/)
+    if m.familia not in FAMILIAS:
+        errores.append("falta 'familia' (1 a 5) según las directrices de logos de módulos.")
+    else:
+        errores += [f"logo: {e}" for e in verificar_logo(m.archivo_logo, m.familia) if not e.startswith("faltan archivos")]
+    errores += [f"nombre: {e}" for e in problemas_nombre(m.nombre)]
     t = m.tratamiento
     for nombre, valor, minimo in (("finalidad", t.finalidad, 10), ("categorias_datos", t.categorias_datos, 3),
                                   ("titulares", t.titulares, 3), ("base_licitud", t.base_licitud, 5),
@@ -276,9 +294,16 @@ def _montar_paginas(app: FastAPI, mod: ModuloCargado):
             return RedirectResponse("/ingresar")
         return pagina_html(front / "index.html")
 
+    def pantalla(request: Request, ruta: str):
+        # Cada pantalla tiene su dirección (/m/<clave>/<pantalla>[/<id>]); el navegador decide qué pintar.
+        if not re.fullmatch(r"[a-z0-9-]+(/[A-Za-z0-9-]+)*", ruta):
+            return RedirectResponse(f"/m/{clave}/")
+        return pagina(request)
+
     app.add_api_route(f"/m/{clave}/", pagina, methods=["GET"], include_in_schema=False)
     app.add_api_route(f"/m/{clave}", lambda: RedirectResponse(f"/m/{clave}/"), methods=["GET"], include_in_schema=False)
-    app.mount(f"/m/{clave}/static", StaticFiles(directory=front), name=f"m-{clave}")
+    app.mount(f"/m/{clave}/static", StaticFiles(directory=front), name=f"m-{clave}")  # antes que las pantallas
+    app.add_api_route(f"/m/{clave}/{{ruta:path}}", pantalla, methods=["GET"], include_in_schema=False)
 
 
 # ------------------------------------------------------------------ acceso y permisos

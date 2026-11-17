@@ -12,7 +12,7 @@ Las palabras **debe** y **no debe** son obligatorias; **conviene** es una recome
 ## 1. Crear un módulo
 
 ```bash
-python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2 [--pictograma pill.svg]
 ```
 
 Copia el ejemplo a `modulos/farmacia/` con la clave ya reemplazada. Luego:
@@ -148,20 +148,30 @@ del módulo debe poder ejecutarlas a mano mientras no exista un hook automático
 > **Obligatorio:** las [directrices de diseño](diseno/README.md) (PDF de la Unidad de Innovación y Desarrollo) definen el ícono
 > del módulo, la navegación, los componentes y la checklist de aprobación. Prevalecen sobre lo que diga esta sección.
 
-- La página debe cargar `/static/css/base.css`, `/static/css/cabecera.css`, `/static/js/comun.js` y
-  `/static/js/cabecera.js`, y arrancar con `iniciarModulo("<clave>")`. Eso pinta la cabecera común (logo actual,
-  nombre del módulo, menú de puntos, tarjeta de cuenta), exige sesión, resuelve el primer ingreso, activa el
-  bloqueo de pantalla (`Ctrl+Alt+L`) y el cierre por inactividad, y entrega los permisos (`modulo.puede(...)`).
-- Contenido dentro de `<main class="modulo-cuerpo">`.
-- Colores **solo** con las variables de `base.css` (`--primario`, `--acento`, `--texto-2`, `--borde`…). Nunca
-  colores fijos: así funcionan el modo oscuro y cualquier ajuste de marca.
-- Reutilizar los componentes existentes: `.btn`, `.btn-texto`, `.btn-borde`, `.campo` (etiqueta flotante),
-  `.aviso-suave`, `dialogo()`, `toast()`, `mostrarErrorEn()`.
+- **Ícono del módulo:** baldosa de su familia (1 a 5) con un pictograma de Lucide. Se genera con
+  `python backend/logo_modulo.py --nombre "<Nombre>" --familia N --pictograma <archivo de 24 × 24>`, que crea todos
+  los archivos de la entrega en `docs/logo/modulos/<nombre>/` y copia el SVG a `frontend/img/modulos/`. El manifiesto
+  declara `familia=N`; el portal valida el ícono y el nombre al cargar el módulo. El logo de Fricke Store no se toca.
+- La página carga `/static/css/base.css`, `/marca/tema.css`, `/static/css/cabecera.css`, `/static/css/modulo.css`,
+  `/static/js/comun.js`, `/static/js/cabecera.js` y `/static/js/modulo.js`, con un `<main>` vacío
+  (ver `modulos/ejemplo/frontend/`).
+- Arranca con `iniciarModulo(clave, {destinos, accion, buscar, alNavegar})`, que arma lo común sin rediseñarlo:
+  barra superior (ícono y nombre → inicio del módulo, buscador, ayuda, menú de 9 puntos, avatar), riel lateral con
+  3 a 7 destinos (pestañas si son menos; barra inferior en teléfono; contraíble con ≡), una acción principal como
+  máximo y una dirección por pantalla (`/m/<clave>/<pantalla>`) con el botón Atrás funcionando. También exige sesión,
+  resuelve el primer ingreso, respeta el bloqueo de pantalla y el cierre por inactividad, y entrega los permisos
+  (`modulo.puede(...)`).
+- Toda pantalla con datos usa los cuatro estados: `cargando()`, `estadoVacio()`, `estadoError()` y `estadoSinPermiso()`.
+  Lo que no se puede deshacer se confirma con `confirmarDestructivo()` (acción en rojo con el verbo exacto).
+- Íconos de interfaz de línea, 20 px, set Lucide: `linea("nombre")` (agregar los que falten a `LINEAS` en `modulo.js`).
+- Colores **solo** con las variables de `base.css`; el color de la familia aparece solo en el ícono.
+- Títulos con `.titulo-pantalla` (22/28) y `.titulo-seccion` (16/24), tarjetas con `.tarjeta`; además `.btn`,
+  `.btn-texto`, `.btn-borde`, `.campo`, `.aviso-suave`, `dialogo()`, `toast()`, `mostrarErrorEn()`.
 - Llamadas al servidor con `api(ruta, {metodo, datos})`: agrega la cabecera anti-CSRF y maneja sesión expirada
   y pantalla bloqueada.
 - Todo texto del servidor pasa por `esc()` antes de ir a `innerHTML`. Sin `eval`, sin scripts en línea (la CSP los bloquea).
-- Accesibilidad (WCAG 2.1 AA, Ley 21.180 de transformación digital): `lang="es-CL"`, enlace "Saltar al contenido",
-  etiquetas en cada campo, foco visible, contraste AA, usable con teclado y a 360 px de ancho.
+- Accesibilidad WCAG 2.2 AA: `lang="es-CL"`, enlace "Saltar al contenido", etiquetas en cada campo, foco visible,
+  contraste AA, todo con teclado, probado a 360 y 1440 px.
 
 ## 9. Convenciones de código
 

@@ -43,24 +43,10 @@
 .cuenta-pie a { color: var(--texto-2); }
 .cuenta-acciones a { color: var(--texto); text-decoration: none; }
 
-/* ---------- cabecera dentro de un módulo ---------- */
-.barra-modulo { justify-content: flex-start; border-bottom: 1px solid var(--borde-suave); padding-top: 0; height: 64px; }
-.barra-modulo .espacio { flex: 1; }
-.marca-modulo { display: flex; align-items: center; gap: 14px; color: var(--texto); min-width: 0; }
-.marca-modulo:hover { text-decoration: none; }
-.marca-modulo .logo { font-size: 22px; }
-.marca-modulo .sep { width: 1px; height: 24px; background: var(--borde); }
-.nombre-modulo { font-size: 18px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ---------- menú de 9 puntos: acceso a la portada desde un módulo ---------- */
+.apps-portada { display: flex; align-items: center; gap: 12px; margin: 8px 4px 0; padding: 10px 12px; border-radius: 12px; color: var(--texto); font-size: 13px; }
+.apps-portada:hover { background: var(--hover); text-decoration: none; }
+.app-logo { width: 48px; height: 48px; display: block; }
 .app.actual { background: var(--primario-suave); }
 
-/* ---------- contenido de un módulo ---------- */
-.modulo-cuerpo { width: min(1080px, 100%); margin: 0 auto; padding: 24px 16px 48px; }
-.sin-acceso { text-align: center; padding: 12vh 16px; color: var(--texto-2); }
-.sin-acceso svg { width: 48px; height: 48px; margin: 0 auto 16px; color: var(--texto-3); }
-.sin-acceso h1 { font-size: 24px; font-weight: 400; color: var(--texto); margin: 0 0 8px; }
-.sin-acceso .btn { margin-top: 16px; }
-
-@media (max-width: 640px) {
-  .enlaces-sup { display: none; }
-  .marca-modulo .logo-texto, .marca-modulo .sep { display: none; }
-}
+@media (max-width: 640px) { .enlaces-sup { display: none; } }

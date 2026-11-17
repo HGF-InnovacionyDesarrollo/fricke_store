@@ -15,7 +15,7 @@ Todos los comandos actúan sobre el establecimiento de ECO_ESTABLECIMIENTO (por 
 
 Módulos (ver docs/MODULOS.md):
   python backend/gestionar.py modulos                             # valida, migra y lista los módulos con código
-  python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"   # copia la plantilla
+  python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2 [--pictograma pill.svg]
   python backend/gestionar.py permiso --rut 12.345.678-5 --permiso ejemplo.moderar [--revocar]
   python backend/gestionar.py depurar                             # aplica los plazos de conservación (a diario)
 
@@ -69,6 +69,9 @@ def main():
     nm = sub.add_parser("nuevo-modulo", help="crea modulos/<clave>/ a partir del módulo de ejemplo")
     nm.add_argument("--clave", required=True)
     nm.add_argument("--nombre", required=True)
+    nm.add_argument("--familia", type=int, required=True, choices=range(1, 6),
+                    help="1 Atención y acceso · 2 Clínica · 3 Calidad y seguridad · 4 Operaciones y equipos · 5 Personas y gestión")
+    nm.add_argument("--pictograma", help="SVG de 24 × 24 con trazo (p. ej. un ícono de Lucide); si falta, se usa uno provisional")
     pm = sub.add_parser("permiso", help="otorga o revoca un permiso interno de módulo a una persona")
     pm.add_argument("--rut", required=True)
     pm.add_argument("--permiso", required=True)
@@ -154,7 +157,10 @@ def main():
             f, m = filas.get(clave), mod.manifiesto
             estado = ("activo" if f["activo"] else "inactivo") if f else "?"
             eipd = (" · EIPD " + ("aprobada" if f["eipd_aprobada"] else "PENDIENTE")) if m.tratamiento.datos_sensibles else ""
-            print(f"{clave:<20} v{m.version:<8} {estado:<9} {m.nombre}{eipd}")
+            from logo_modulo import verificar as verificar_logo
+            pendientes = verificar_logo(m.archivo_logo, m.familia)
+            logo = " · logo: " + "; ".join(pendientes) if pendientes else ""
+            print(f"{clave:<20} v{m.version:<8} {estado:<9} {m.nombre}{eipd}{logo}")
         if not reg:
             print("No hay módulos con código en modulos/.")
 
@@ -170,7 +176,7 @@ def main():
         _nuevo_establecimiento(a.clave, a.producto, a.institucion)
 
     elif a.cmd == "nuevo-modulo":
-        _nuevo_modulo(a.clave, a.nombre)
+        _nuevo_modulo(a.clave, a.nombre, a.familia, a.pictograma)
 
     elif a.cmd == "permiso":
         import plataforma
@@ -255,12 +261,19 @@ def _nuevo_establecimiento(clave: str, producto: str, institucion: str):
     print(f"Establecimiento creado en {destino}. Completa su ficha (DPD, mesa de ayuda, colores) y su logo; ver docs/RED.md.")
 
 
-def _nuevo_modulo(clave: str, nombre: str):
+def _nuevo_modulo(clave: str, nombre: str, familia: int, pictograma: str | None):
     import re
     import shutil
+    from pathlib import Path
     import config as cfg
+    import logo_modulo
     if not re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", clave) or len(clave) > 40:
         sys.exit("La clave usa minúsculas, números y _ (ej.: farmacia, control_temperatura).")
+    problemas = logo_modulo.problemas_nombre(nombre)
+    if problemas:
+        sys.exit("Nombre del módulo: " + " ".join(problemas) + " (ver docs/diseno/)")
+    if (logo_modulo.DIR_APP / f"{logo_modulo.slug(nombre)}.svg").exists():
+        sys.exit(f"Ya existe un ícono llamado {logo_modulo.slug(nombre)}.svg: elige otro nombre.")
     origen, destino = cfg.MODULOS_DIR / "ejemplo", cfg.MODULOS_DIR / clave
     if destino.exists():
         sys.exit(f"Ya existe {destino}.")
@@ -270,10 +283,22 @@ def _nuevo_modulo(clave: str, nombre: str):
             t = archivo.read_text(encoding="utf-8")
             t = t.replace('CLAVE = "ejemplo"', f'CLAVE = "{clave}"').replace("/m/ejemplo/", f"/m/{clave}/")
             t = t.replace('const CLAVE = "ejemplo";', f'const CLAVE = "{clave}";').replace("Tablón de avisos", nombre)
+            t = t.replace("    familia=5,", f"    familia={familia},")
             archivo.write_text(t, encoding="utf-8")
+    # Ícono según las directrices: baldosa de la familia + pictograma (provisional si no se entregó uno)
+    picto = destino / "pictograma.svg"
+    if pictograma:
+        picto.write_text(Path(pictograma).read_text(encoding="utf-8"), encoding="utf-8")
+    else:
+        picto.write_text('<!-- PROVISIONAL: reemplazar por un pictograma propio (Lucide, retícula 24, trazo 2) -->\n'
+                         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+                         '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/></svg>\n', encoding="utf-8")
+        print("Aviso: el pictograma es provisional. Cámbialo antes de publicar el módulo.")
+    logo_modulo.generar(nombre, familia, picto)
     print(f"Módulo creado en {destino}.")
     print("Siguientes pasos: completa la ficha de tratamiento en manifiesto.py, reemplaza las tablas de "
-          "migraciones/001_inicial.sql y la API de api.py, y revisa la lista de docs/MODULOS.md antes de publicarlo.")
+          "migraciones/001_inicial.sql y la API de api.py, y revisa las listas de docs/MODULOS.md y "
+          "docs/diseno/ antes de publicarlo.")
 
 
 if __name__ == "__main__":

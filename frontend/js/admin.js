@@ -452,7 +452,8 @@ document.addEventListener("click", (e) => {
       (lista.length ? lista.map((m) => {
         const visible = m.activo && (!m.datos_sensibles || m.eipd_aprobada) && m.roles.length;
         return `<div class="tfila t-modulos">
-          <span class="mod-icono" style="background:${esc(m.color)}">${icono(m.icono) || esc(m.nombre[0])}</span>
+          ${(m.icono || "").startsWith("/static/img/modulos/") ? `<img class="mod-logo" src="${esc(m.icono)}" alt="" width="32" height="32">`
+            : `<span class="mod-icono" style="background:${esc(m.color)}">${icono(m.icono) || esc(m.nombre[0])}</span>`}
           <span>${esc(m.nombre)}<small>${esc(m.url)} · ${m.roles.map((r) => esc(ROLES[r] || r)).join(", ") || "sin perfiles"}</small></span>
           <span>${esc(m.finalidad)}<small>${esc(m.categorias_datos)}</small></span>
           <span class="chips">${visible ? '<span class="chip ok">Visible</span>' : '<span class="chip">Oculto</span>'}${m.datos_sensibles ? `<span class="chip ${m.eipd_aprobada ? "info" : "alerta"}">${m.eipd_aprobada ? "EIPD aprobada" : "EIPD pendiente"}</span>` : ""}</span>

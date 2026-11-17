@@ -10,6 +10,7 @@
 .buscador label { background: var(--fondo); }
 .fila-mfa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; }
 .fila-mfa small { color: var(--texto-3); }
+.mod-logo { width: 32px; height: 32px; display: block; }
 .filtros-bitacora { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
 .filtros-bitacora .buscador { flex: 1 1 280px; margin-bottom: 0; }
 .filtros-bitacora .fecha { flex: 0 1 170px; margin-bottom: 0; }

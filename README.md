@@ -84,7 +84,7 @@ Los módulos viven en `modulos/<clave>/` y siguen las **[directrices para módul
 con RUT, la cabecera con el logo, la bitácora encadenada y los respaldos, y declaran su ficha de tratamiento (Ley 21.719).
 
 ```bash
-python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"   # parte desde el módulo de ejemplo
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2   # parte desde el módulo de ejemplo
 python backend/gestionar.py modulos                                             # valida, migra y lista
 ```
 

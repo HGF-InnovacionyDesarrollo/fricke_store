@@ -4,31 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tablón de avisos · {{producto}}</title>
-<link rel="icon" href="/marca/icono.svg" type="image/svg+xml">
-<link rel="icon" href="/marca/favicon-32.png" type="image/png" sizes="32x32">
-<link rel="apple-touch-icon" href="/marca/apple-touch-icon.png">
-<!-- Obligatorio en todo módulo: estilos base y cabecera común del portal -->
+<!-- Obligatorio en todo módulo (docs/diseno/): estilos base, marca, cabecera común y esqueleto de módulo -->
 <link rel="stylesheet" href="/static/css/base.css">
 <link rel="stylesheet" href="/marca/tema.css">
 <link rel="stylesheet" href="/static/css/cabecera.css">
-<!-- Estilos propios del módulo (usar solo las variables de base.css) -->
+<link rel="stylesheet" href="/static/css/modulo.css">
+<!-- Estilos propios del módulo (solo variables de base.css) -->
 <link rel="stylesheet" href="/m/ejemplo/static/app.css">
 </head>
 <body>
 <a class="sr" href="#contenido">Saltar al contenido</a>
-<!-- La cabecera (logo, nombre del módulo, menú de puntos y cuenta) la inserta cabecera.js -->
-
-<main class="modulo-cuerpo" id="contenido">
-  <div class="cab-modulo">
-    <h1>Tablón de avisos</h1>
-    <button class="btn oculto" id="btn-nuevo"><span data-icono="mas"></span>Nuevo aviso</button>
-  </div>
-  <p class="aviso-suave"><span data-icono="escudo"></span>No publiques datos de pacientes. Los avisos se eliminan automáticamente al cumplir un año.</p>
-  <div id="lista-avisos" class="lista-avisos" aria-live="polite"></div>
-</main>
+<!-- La barra superior (ícono y nombre, buscador, ayuda, 9 puntos, avatar) y el riel los arma modulo.js -->
+<main id="contenido"></main>
 
 <script src="/static/js/comun.js"></script>
 <script src="/static/js/cabecera.js"></script>
+<script src="/static/js/modulo.js"></script>
 <script src="/m/ejemplo/static/app.js"></script>
 </body>
 </html>

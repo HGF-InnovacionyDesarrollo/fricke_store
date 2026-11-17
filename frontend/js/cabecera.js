@@ -28,15 +28,19 @@ const _HTML_POPS = `
 
 const _HTML_BARRA_MODULO = `
 <header class="barra-sup barra-modulo">
-  <a class="marca-modulo" href="/" title="Volver a la portada">
-    <span class="logo" data-logo></span>
-    <span class="sep" aria-hidden="true"></span>
-    <span class="nombre-modulo" id="nombre-modulo"></span>
-  </a>
+  <button class="btn-icono oculto" id="btn-riel" aria-label="Contraer o expandir el menú" title="Menú" aria-expanded="true"><span data-linea="menu"></span></button>
+  <a class="logo-modulo" id="inicio-modulo" href="/"><img id="icono-modulo" alt="" width="32" height="32"><span class="nombre-modulo" id="nombre-modulo"></span></a>
+  <form class="buscador-modulo oculto" id="form-buscar" role="search">
+    <span data-linea="search" aria-hidden="true"></span>
+    <label class="sr" for="buscar-modulo">Buscar</label>
+    <input id="buscar-modulo" type="search" autocomplete="off" maxlength="200">
+  </form>
   <span class="espacio"></span>
+  <button class="btn-icono" id="btn-ayuda" aria-label="Ayuda" title="Ayuda"><span data-linea="circle-help"></span></button>
   <button class="btn-icono" id="btn-apps" aria-label="Módulos del ecosistema" aria-haspopup="true" aria-expanded="false" title="Módulos del ecosistema"><span data-icono="apps"></span></button>
   <button class="btn-avatar" id="btn-cuenta" aria-label="Tu cuenta" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="avatar-sup"></span></button>
-</header>`;
+</header>
+<div class="progreso oculto" id="progreso" role="progressbar" aria-label="Cargando"></div>`;
 
 /**
  * Pinta la cabecera y conecta sus paneles.
@@ -48,11 +52,18 @@ async function iniciarCabecera(yo, { modulo } = {}) {
   if (!document.querySelector(".barra-sup")) document.body.insertAdjacentHTML("afterbegin", _HTML_BARRA_MODULO);
   if (!document.getElementById("pop-cuenta")) document.body.insertAdjacentHTML("beforeend", _HTML_POPS);
   pintarIconos(document.querySelector(".barra-sup"));
+  if (typeof pintarLineas === "function") pintarLineas(document.querySelector(".barra-sup"));
   pintarIconos(document.getElementById("pop-cuenta"));
   await cargarConfig();  // vuelve a pintar el logotipo recién insertado
 
   if (modulo) {
     document.getElementById("nombre-modulo").textContent = modulo.nombre;
+    document.getElementById("inicio-modulo").href = modulo.url;
+    document.getElementById("inicio-modulo").title = `Inicio de ${modulo.nombre}`;
+    document.getElementById("icono-modulo").src = modulo.icono;
+    // Pestaña del navegador: el ícono solo del módulo
+    document.querySelectorAll('link[rel="icon"]').forEach((l) => l.remove());
+    document.head.insertAdjacentHTML("beforeend", `<link rel="icon" type="image/svg+xml" href="${esc(modulo.icono)}">`);
     document.title = `${modulo.nombre} · ${CONFIG.producto}`;
   }
 
@@ -100,7 +111,9 @@ async function iniciarCabecera(yo, { modulo } = {}) {
     lista.innerHTML = mods.length
       ? `<div class="apps-grilla">${mods.map((m) => `
           <a class="app${modulo && m.clave === modulo.clave ? " actual" : ""}" href="${esc(m.url)}" title="${esc(m.descripcion || m.nombre)}">
-            <span class="app-icono" style="background:${esc(m.color || "#1565c0")}">${icono(m.icono) || esc(m.nombre[0])}</span>
+            ${(m.icono || "").startsWith("/static/img/modulos/")
+              ? `<img class="app-logo" src="${esc(m.icono)}" alt="" width="48" height="48">`
+              : `<span class="app-icono" style="background:${esc(m.color || "#1565c0")}">${icono(m.icono) || esc(m.nombre[0])}</span>`}
             <span>${esc(m.nombre)}</span></a>`).join("")}</div>`
       : `<div class="apps-vacio">
           <div class="ilus">${icono("modulos")}</div>
@@ -108,30 +121,10 @@ async function iniciarCabecera(yo, { modulo } = {}) {
           <p>Las soluciones del hospital se irán sumando aquí. Solo verás las que correspondan a tu función.</p>
         </div>`;
   } catch (_) {
-    lista.innerHTML = `<div class="apps-vacio"><p>No se pudieron cargar los módulos.</p></div>`;
+    lista.innerHTML = `<div class="apps-vacio"><p>No pudimos cargar los módulos.</p></div>`;
   }
-}
-
-/**
- * Arranque estándar de la página de un módulo: sesión, primer ingreso, cabecera y permisos.
- * Devuelve { yo, modulo } o null si la persona no tiene acceso (ya se le mostró el aviso).
- */
-async function iniciarModulo(clave) {
-  pintarIconos();
-  let yo;
-  try { yo = await exigirSesion(); } catch (_) { return null; }
-  let modulo;
-  try {
-    modulo = await api(`/api/modulos/${encodeURIComponent(clave)}/contexto`);
-  } catch (e) {
-    await iniciarCabecera(yo);
-    document.querySelector("main").innerHTML = `<div class="sin-acceso">${icono("candado")}
-      <h1>No tienes acceso a este módulo</h1><p>${esc(e.message)}</p>
-      <p>Si lo necesitas para tu trabajo, pídelo a tu jefatura o a ${esc(CONFIG.mesa_ayuda)}.</p>
-      <a class="btn" href="/">Volver a la portada</a></div>`;
-    return null;
+  if (modulo) {
+    lista.insertAdjacentHTML("beforeend", `<a class="apps-portada" href="/"><img src="/marca/icono.svg" alt="" width="24" height="24">
+      <span>Portada de ${esc(CONFIG.producto)}</span></a>`);
   }
-  await iniciarCabecera(yo, { modulo });
-  modulo.puede = (permiso) => modulo.permisos.includes(permiso);
-  return { yo, modulo };
 }

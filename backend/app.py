@@ -588,7 +588,8 @@ def contexto_modulo(clave: str, request: Request):
     ctx = acceso(clave)(sesion_lista(request))
     m = REGISTRO[clave].manifiesto
     return {"clave": m.clave, "nombre": m.nombre, "descripcion": m.descripcion, "icono": m.icono,
-            "color": m.color, "version": m.version, "permisos": sorted(ctx.permisos),
+            "color": m.color, "familia": m.familia, "version": m.version, "permisos": sorted(ctx.permisos),
+            "finalidad": m.tratamiento.finalidad,
             "datos_sensibles": m.tratamiento.datos_sensibles}
 
 

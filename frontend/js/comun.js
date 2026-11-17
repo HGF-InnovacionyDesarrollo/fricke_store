@@ -101,7 +101,7 @@ function fechaLocal(iso, conHora = true) {
   if (!iso) return "—";
   const d = new Date(iso.length <= 10 ? iso + "T12:00:00" : iso);
   return d.toLocaleString("es-CL", conHora
-    ? { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
+    ? { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }
     : { day: "numeric", month: "long", year: "numeric" });
 }
 
