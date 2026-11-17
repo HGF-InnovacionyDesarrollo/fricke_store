@@ -14,6 +14,9 @@
 ## Hecho (v0.4, nov 2026)
 - PostgreSQL como base relacional: esquema `portal` y un esquema con rol propio por módulo, migraciones numeradas, traslado desde SQLite y respaldos con `pg_dump`.
 
+## Hecho (v0.5, nov 2026)
+- Plataforma de la red: una instalación por establecimiento con el mismo código (`establecimientos/<clave>/`), partiendo por Fricke Store y Marga-Marga Store.
+
 ## Próximo
 1. **Asistente de IA real**: búsqueda sobre protocolos y documentos institucionales (RAG). Preferir un modelo que corra en la red del hospital o con contrato que garantice no entrenar con los datos; evaluación de impacto antes de abrirlo. Filtro que detecte RUT o nombres de pacientes antes de enviar la pregunta.
 2. **Notificaciones por correo institucional** (SMTP del hospital) cuando se aprueba una cuenta o se responde una solicitud.

@@ -66,7 +66,7 @@ async function cargarConfig() {
   document.querySelectorAll("[data-cfg]").forEach((el) => { el.textContent = CONFIG[el.dataset.cfg] ?? ""; });
   document.querySelectorAll("[data-logo]").forEach((el) => {
     // isotipo (grilla de módulos con el símbolo del hospital) + nombre con degradado azul → menta
-    el.innerHTML = `<img class="logo-icono" src="/static/img/logo-icono.svg" alt=""><span class="logo-texto">${esc(CONFIG.producto)}</span>`;
+    el.innerHTML = `<img class="logo-icono" src="/marca/logo-icono.svg" alt=""><span class="logo-texto">${esc(CONFIG.producto)}</span>`;
     el.setAttribute("aria-label", CONFIG.producto);
   });
   return CONFIG;

@@ -9,6 +9,9 @@
   python backend/gestionar.py archivar-bitacora                  # según ECO_RETENCION_BITACORA_DIAS
   python backend/gestionar.py solicitudes                         # solicitudes de derechos pendientes
 
+Todos los comandos actúan sobre el establecimiento de ECO_ESTABLECIMIENTO (por defecto fricke). Ver docs/RED.md.
+  python backend/gestionar.py nuevo-establecimiento --clave quillota --producto "Quillota Store" --institucion "Hospital …"
+
 Módulos (ver docs/MODULOS.md):
   python backend/gestionar.py modulos                             # valida, migra y lista los módulos con código
   python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"   # copia la plantilla
@@ -55,6 +58,10 @@ def main():
     sub.add_parser("archivar-bitacora", help="archiva lo más antiguo que la retención configurada")
     sub.add_parser("solicitudes")
     sub.add_parser("modulos")
+    ne = sub.add_parser("nuevo-establecimiento", help="crea establecimientos/<clave>/ a partir de la ficha de Fricke")
+    ne.add_argument("--clave", required=True)
+    ne.add_argument("--producto", required=True)
+    ne.add_argument("--institucion", required=True)
     im = sub.add_parser("importar-sqlite", help="traslada los datos de la base SQLite anterior a PostgreSQL")
     im.add_argument("--origen", help="ruta del ecosistema.db (por defecto data/ecosistema.db)")
     sub.add_parser("depurar", help="aplica el plazo de conservación de cada módulo")
@@ -148,6 +155,9 @@ def main():
     elif a.cmd == "importar-sqlite":
         _importar_sqlite(a.origen)
 
+    elif a.cmd == "nuevo-establecimiento":
+        _nuevo_establecimiento(a.clave, a.producto, a.institucion)
+
     elif a.cmd == "nuevo-modulo":
         _nuevo_modulo(a.clave, a.nombre)
 
@@ -212,6 +222,26 @@ def _importar_sqlite(origen: str | None):
     print("Bitácora íntegra tras el traslado." if r["integra"] else f"¡ALERTA! La bitácora no verifica (registro #{r['falla_en_id']}).")
     auditar("datos_importados_sqlite", None, f"{sum(resumen.values())} filas desde {ruta.name}")
     print(f"Listo. Conserva {ruta} como respaldo hasta confirmar que todo funciona; después guárdalo cifrado o elimínalo.")
+
+
+def _nuevo_establecimiento(clave: str, producto: str, institucion: str):
+    import json
+    import re
+    from establecimiento import RAIZ
+    if not re.fullmatch(r"[a-z][a-z0-9_]{1,30}", clave):
+        sys.exit("La clave usa minúsculas, números y _ (ej.: quillota, san_antonio).")
+    destino = RAIZ / clave
+    if destino.exists():
+        sys.exit(f"Ya existe {destino}.")
+    base = json.loads((RAIZ / "fricke" / "establecimiento.json").read_text(encoding="utf-8"))
+    base.update({"clave": clave, "producto": producto, "institucion": institucion,
+                 "jefe_servicio": f"Director(a) del {institucion}", "comuna": "", "unidad_desarrolladora": "Unidad de Innovación y Desarrollo",
+                 "unidad_desarrolladora_detalle": f"{institucion} (completar)", "palabras_contrasena": [clave.replace("_", "")]})
+    (destino / "marca").mkdir(parents=True)
+    (destino / "establecimiento.json").write_text(json.dumps(base, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    for n in ("icono.svg", "logo-icono.svg"):  # logo provisional: el de Marga-Marga (grilla sin símbolo)
+        (destino / "marca" / n).write_bytes((RAIZ / "marga_marga" / "marca" / n).read_bytes())
+    print(f"Establecimiento creado en {destino}. Completa su ficha (DPD, mesa de ayuda, colores) y su logo; ver docs/RED.md.")
 
 
 def _nuevo_modulo(clave: str, nombre: str):

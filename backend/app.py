@@ -3,6 +3,7 @@
 Ejecutar:  python -m uvicorn app:app --app-dir backend --port 8090
 """
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -11,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import config as cfg
+from establecimiento import tema_css
 from plazos import sumar_corridos, sumar_habiles
 from db import ahora, auditar, bd, inicializar, verificar_auditoria
 from seguridad import (HASH_SEÑUELO, enmascarar_rut, formatear_rut, hash_clave, hash_token,
@@ -254,6 +256,9 @@ def configuracion_publica():
         "inactividad_min": cfg.SESION_INACTIVIDAD_MIN,
         "jefe_servicio": cfg.JEFE_SERVICIO,
         "clave_largo_min": cfg.CLAVE_LARGO_MIN,
+        "establecimiento": cfg.ESTABLECIMIENTO,
+        "unidad": cfg.UNIDAD_DESARROLLADORA,
+        "red": cfg.NOMBRE_RED,
     }
 
 
@@ -468,7 +473,7 @@ app.include_router(router_gestion)
 
 
 # ------------------------------------------------------------------ módulos del ecosistema (carpeta modulos/)
-from plataforma import REGISTRO, acceso, cargar_modulos, exportar_titular as exportar_modulos  # noqa: E402
+from plataforma import REGISTRO, acceso, cargar_modulos, exportar_titular as exportar_modulos, pagina_html  # noqa: E402
 
 cargar_modulos(app, sesion_lista, ETIQUETAS_ACCION)
 
@@ -487,7 +492,21 @@ def contexto_modulo(clave: str, request: Request):
 
 # ------------------------------------------------------------------ páginas
 def _pagina(nombre: str):
-    return FileResponse(cfg.FRONTEND_DIR / nombre, headers={"Cache-Control": "no-store"})
+    return pagina_html(cfg.FRONTEND_DIR / nombre)
+
+
+# ------------------------------------------------------------------ marca del establecimiento
+@app.get("/marca/tema.css", include_in_schema=False)
+def tema():
+    return Response(tema_css(), media_type="text/css", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/marca/{archivo}", include_in_schema=False)
+def marca(archivo: str):
+    """Logo e íconos de establecimientos/<clave>/marca/ (solo nombres simples, sin rutas)."""
+    if not re.fullmatch(r"[a-z0-9-]+\.(svg|png|ico)", archivo) or not (cfg.MARCA_DIR / archivo).is_file():
+        raise HTTPException(404, "No encontrado.")
+    return FileResponse(cfg.MARCA_DIR / archivo, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/")
@@ -518,7 +537,10 @@ def pagina_admin(request: Request):
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    return FileResponse(cfg.FRONTEND_DIR / "favicon.ico", media_type="image/x-icon")
+    ico = cfg.MARCA_DIR / "favicon.ico"
+    if ico.is_file():
+        return FileResponse(ico, media_type="image/x-icon")
+    return RedirectResponse("/marca/icono.svg")
 
 
 @app.get("/privacidad")

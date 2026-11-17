@@ -3,6 +3,7 @@
 Una sola base con un esquema por dueño: "portal" para el núcleo y "m_<clave>" para cada módulo.
 Las consultas se escriben con marcadores `?` (como en el resto del código); `Conexion` los traduce.
 """
+import atexit
 import hashlib
 import json
 import re
@@ -14,7 +15,7 @@ from pathlib import Path
 import psycopg
 from psycopg_pool import ConnectionPool
 
-from config import DATABASE_URL, ESQUEMA_PORTAL
+from config import DATABASE_URL, ESQUEMA_PORTAL, ESTABLECIMIENTO
 
 GENESIS = "0" * 64
 MIGRACIONES_PORTAL = Path(__file__).parent / "migraciones"
@@ -127,6 +128,7 @@ def pool() -> ConnectionPool:
             _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=20, open=True,
                                    kwargs={"options": f"-c search_path={ESQUEMA_PORTAL} -c timezone=UTC", "connect_timeout": 10},
                                    reset=_restablecer)
+            atexit.register(_pool.close)  # cierre ordenado al terminar (consola y servidor)
         return _pool
 
 
@@ -235,7 +237,7 @@ def _espejo_siem(ts, usuario_id, accion, detalle, ip, h):
     try:
         LOG_SIEM.parent.mkdir(parents=True, exist_ok=True)
         with open(LOG_SIEM, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"ts": ts, "app": "fricke-store", "usuario_id": usuario_id, "accion": accion,
+            fh.write(json.dumps({"ts": ts, "app": f"{ESTABLECIMIENTO}-store", "usuario_id": usuario_id, "accion": accion,
                                  "detalle": detalle, "ip": ip, "hash": h}, ensure_ascii=False) + "\n")
     except OSError:
         pass  # el espejo nunca debe impedir registrar en la bitácora principal

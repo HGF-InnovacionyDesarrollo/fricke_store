@@ -1,4 +1,5 @@
-# PostgreSQL para DESARROLLO en el PC (en producción se usa el servidor del hospital).
+# PostgreSQL para DESARROLLO en el PC (en producción, el servidor de cada hospital).
+# Aloja una base por establecimiento: fricke_store, marga_marga_store, … (docker exec fricke-db createdb -U fricke <clave>_store)
 #   docker compose up -d        # levanta la base en localhost:5432
 #   docker compose down         # la detiene (los datos quedan en el volumen fricke-pg)
 # La contraseña de aquí es solo para desarrollo; en producción va en ECO_DATABASE_URL fuera del repositorio.

@@ -67,11 +67,13 @@ HASH_SEÑUELO = hash_clave(secrets.token_hex(8))
 
 
 # Lista de bloqueo (NIST SP 800-63B rev. 4): contraseñas comunes, filtradas o propias del contexto.
+from establecimiento import EST  # noqa: E402
+
 _BLOQUEADAS_ARCHIVO = Path(__file__).with_name("claves_bloqueadas.txt")
 _BLOQUEADAS = {l.strip().lower() for l in _BLOQUEADAS_ARCHIVO.read_text(encoding="utf-8").splitlines()
                if l.strip() and not l.startswith("#")} if _BLOQUEADAS_ARCHIVO.exists() else set()
-_CONTEXTO = ("fricke", "hospital", "gustavo", "innova", "password", "contrasena", "contraseña", "clave", "store",
-             "vinadelmar", "viñadelmar", "quillota", "chile")
+_CONTEXTO = ("hospital", "password", "contrasena", "contraseña", "clave", "store", "quillota", "chile",
+             *(p.lower() for p in EST.get("palabras_contrasena", [])))
 
 
 def problemas_clave(clave: str, rut: str, nombre: str = "") -> list[str]:

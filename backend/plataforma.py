@@ -1,4 +1,4 @@
-"""Plataforma de módulos de Fricke Store: lo que todo módulo usa y debe cumplir.
+"""Plataforma de módulos del ecosistema de la red: lo que todo módulo usa y debe cumplir.
 
 Un módulo es una carpeta `modulos/<clave>/` con:
   __init__.py            exporta MANIFIESTO y router (y, opcional, exportar_titular / depurar)
@@ -20,11 +20,14 @@ from pathlib import Path
 from typing import Callable
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from html import escape
+
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import config as cfg
 from db import ahora, aplicar_migraciones, auditar, bd
+from establecimiento import textos
 
 CLAVE_VALIDA = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 ACCION_VALIDA = re.compile(r"[a-z][a-z0-9_]{2,60}")
@@ -130,7 +133,7 @@ def esquema_de(clave: str) -> str:
 
 
 def rol_de(clave: str) -> str:
-    return f"fricke_m_{clave}"
+    return f"{cfg.ESTABLECIMIENTO}_m_{clave}"
 
 
 _ROLES_ACTIVOS: dict[str, str | None] = {}
@@ -210,6 +213,20 @@ def _registrar(m: Manifiesto):
     auditar(evento[0], None, evento[1])
 
 
+# ------------------------------------------------------------------ páginas con los datos del establecimiento
+_CACHE_HTML: dict[Path, str] = {}
+
+
+def pagina_html(ruta: Path) -> HTMLResponse:
+    """Sirve una página reemplazando {{producto}}, {{institucion}}, {{unidad}} y {{unidad_detalle}}."""
+    if ruta not in _CACHE_HTML:
+        html = ruta.read_text(encoding="utf-8")
+        for k, v in textos().items():
+            html = html.replace("{{" + k + "}}", escape(v))
+        _CACHE_HTML[ruta] = html
+    return HTMLResponse(_CACHE_HTML[ruta], headers={"Cache-Control": "no-store"})
+
+
 # ------------------------------------------------------------------ carga
 def cargar_modulos(app: FastAPI | None = None, sesion_lista=None, etiquetas: dict | None = None) -> dict[str, ModuloCargado]:
     """Descubre, valida, migra, registra y monta cada módulo de modulos/. Un módulo con errores
@@ -257,7 +274,7 @@ def _montar_paginas(app: FastAPI, mod: ModuloCargado):
     def pagina(request: Request):
         if not request.cookies.get(cfg.COOKIE_NOMBRE):
             return RedirectResponse("/ingresar")
-        return FileResponse(front / "index.html", headers={"Cache-Control": "no-store"})
+        return pagina_html(front / "index.html")
 
     app.add_api_route(f"/m/{clave}/", pagina, methods=["GET"], include_in_schema=False)
     app.add_api_route(f"/m/{clave}", lambda: RedirectResponse(f"/m/{clave}/"), methods=["GET"], include_in_schema=False)

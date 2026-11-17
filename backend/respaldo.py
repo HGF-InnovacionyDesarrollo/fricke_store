@@ -1,4 +1,4 @@
-"""Respaldos cifrados de Fricke Store (Ley 21.719 art. 14 quinquies; DS 7/2023 art. 11; Ley 21.663 art. 8).
+"""Respaldos cifrados de cada establecimiento del ecosistema (Ley 21.719 art. 14 quinquies; DS 7/2023 art. 11; Ley 21.663 art. 8).
 
   python backend/respaldo.py crear      # pg_dump de toda la base (portal y módulos), cifrado + copia externa + rotación
   python backend/respaldo.py probar     # lo restaura en una base temporal, verifica la bitácora y la borra
@@ -71,14 +71,14 @@ def _correr(comando: str, args: list[str], entrada: bytes | None = None) -> byte
 
 
 def respaldos() -> list[Path]:
-    return sorted(cfg.RESPALDOS_DIR.glob(f"fricke-*{SUFIJO}"))
+    return sorted(cfg.RESPALDOS_DIR.glob(f"{cfg.ESTABLECIMIENTO}-*{SUFIJO}"))
 
 
 def crear() -> Path:
     inicializar()
     cfg.RESPALDOS_DIR.mkdir(parents=True, exist_ok=True)
     sello = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    destino = cfg.RESPALDOS_DIR / f"fricke-{sello}{SUFIJO}"
+    destino = cfg.RESPALDOS_DIR / f"{cfg.ESTABLECIMIENTO}-{sello}{SUFIJO}"
     # Formato custom: copia consistente aunque el portal esté funcionando; incluye el portal y todos los esquemas m_*.
     volcado = _correr(cfg.PG_DUMP, ["--format=custom", "--no-password", f"--dbname={cfg.DATABASE_URL}"])
     destino.write_bytes(_clave().encrypt(gzip.compress(volcado, compresslevel=9)))

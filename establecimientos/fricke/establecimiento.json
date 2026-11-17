@@ -1,0 +1,17 @@
+{
+  "clave": "fricke",
+  "producto": "Fricke Store",
+  "institucion": "Hospital Dr. Gustavo Fricke",
+  "comuna": "Viña del Mar",
+  "unidad_desarrolladora": "Innova Fricke",
+  "unidad_desarrolladora_detalle": "Unidad de Innovación y Desarrollo",
+  "jefe_servicio": "Director(a) del Hospital Dr. Gustavo Fricke",
+  "correo_dpd": "protecciondedatos@hospital.cl",
+  "mesa_ayuda": "Anexo 0000 · Mesa de ayuda TI",
+  "dominio_correo": "",
+  "palabras_contrasena": ["fricke", "gustavo", "innova", "vinadelmar", "viñadelmar"],
+  "colores": {
+    "claro": {"--primario": "#1565c0", "--acento": "#1fa58f", "--acento-texto": "#13806f", "--primario-suave": "#d3e4f8", "--acento-suave": "#e0f5f0"},
+    "oscuro": {"--primario": "#82b4f5", "--acento": "#5fd3bd", "--acento-texto": "#5fd3bd", "--primario-suave": "#17406f", "--acento-suave": "#123f39"}
+  }
+}

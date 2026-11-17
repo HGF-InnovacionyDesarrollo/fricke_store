@@ -2,33 +2,40 @@
 import os
 from pathlib import Path
 
+from establecimiento import CLAVE as ESTABLECIMIENTO, EST
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
-DATOS_DIR = BASE_DIR / "data"   # logs, respaldos y claves locales (nunca se versiona)
+# Logs, respaldos y claves locales de ESTE establecimiento (nunca se versiona)
+DATOS_DIR = Path(os.environ.get("ECO_DATOS_DIR", BASE_DIR / "data" / ESTABLECIMIENTO))
 
 # Base de datos PostgreSQL. Desarrollo: docker compose up -d (ver docker-compose.yml).
 # Producción: el servidor del hospital, con TLS (agregar ?sslmode=require) y una contraseña fuera del repositorio.
-DATABASE_URL = os.environ.get("ECO_DATABASE_URL", "postgresql://fricke:fricke_desarrollo@127.0.0.1:5432/fricke_store")
+DATABASE_URL = os.environ.get("ECO_DATABASE_URL", f"postgresql://fricke:fricke_desarrollo@127.0.0.1:5432/{ESTABLECIMIENTO}_store")
 ESQUEMA_PORTAL = "portal"          # núcleo; cada módulo usa su propio esquema m_<clave>
 # Base SQLite de las versiones anteriores, solo para trasladar los datos (gestionar.py importar-sqlite)
-SQLITE_ANTERIOR = Path(os.environ.get("ECO_DB", DATOS_DIR / "ecosistema.db"))
+SQLITE_ANTERIOR = Path(os.environ.get("ECO_DB", BASE_DIR / "data" / "ecosistema.db"))
 
 # Módulos del ecosistema: código en modulos/<clave>/, datos en el esquema m_<clave>
 MODULOS_DIR = BASE_DIR / "modulos"
 # Cada módulo usa un rol de PostgreSQL propio, dueño solo de su esquema (requiere CREATEROLE)
 ROLES_POR_MODULO = os.environ.get("ECO_ROLES_POR_MODULO", "1") == "1"
 
-# Identidad de la institución (aparece en la portada, el aviso de privacidad y la cuenta)
-NOMBRE_INSTITUCION = os.environ.get("ECO_INSTITUCION", "Hospital Dr. Gustavo Fricke")
-NOMBRE_PRODUCTO = os.environ.get("ECO_PRODUCTO", "Fricke Store")
-CORREO_DPD = os.environ.get("ECO_CORREO_DPD", "protecciondedatos@hospital.cl")  # Delegado de Protección de Datos
-MESA_AYUDA = os.environ.get("ECO_MESA_AYUDA", "Anexo 0000 · Mesa de ayuda TI")
+# Identidad del establecimiento: viene de establecimientos/<clave>/establecimiento.json (ECO_ESTABLECIMIENTO).
+# Las variables ECO_* siguen pudiendo sobrescribir cada dato.
+NOMBRE_INSTITUCION = os.environ.get("ECO_INSTITUCION", EST["institucion"])
+NOMBRE_PRODUCTO = os.environ.get("ECO_PRODUCTO", EST["producto"])
+CORREO_DPD = os.environ.get("ECO_CORREO_DPD", EST["correo_dpd"])  # Delegado de Protección de Datos
+MESA_AYUDA = os.environ.get("ECO_MESA_AYUDA", EST["mesa_ayuda"])
+UNIDAD_DESARROLLADORA = EST["unidad_desarrolladora"]
+NOMBRE_RED = EST["red"].get("nombre", "")
+MARCA_DIR = EST["carpeta_marca"]
 
 # Sesión
 SESION_INACTIVIDAD_MIN = int(os.environ.get("ECO_INACTIVIDAD_MIN", 15))  # cierre por inactividad
 SESION_MAXIMA_HORAS = int(os.environ.get("ECO_SESION_MAX_H", 12))       # duración de un turno
 COOKIE_SEGURA = os.environ.get("ECO_COOKIE_SEGURA", "0") == "1"         # poner 1 al servir por HTTPS
-COOKIE_NOMBRE = "eco_sesion"
+COOKIE_NOMBRE = f"eco_sesion_{ESTABLECIMIENTO}"  # una por establecimiento: no se pisan en el mismo dominio
 
 # Intentos de acceso
 MAX_INTENTOS = int(os.environ.get("ECO_MAX_INTENTOS", 5))
@@ -38,10 +45,10 @@ BLOQUEO_MIN = int(os.environ.get("ECO_BLOQUEO_MIN", 15))
 LIMITE_PUBLICO = int(os.environ.get("ECO_LIMITE_PUBLICO", 5))
 VENTANA_PUBLICO_MIN = int(os.environ.get("ECO_VENTANA_PUBLICO_MIN", 15))
 # Si se define (p. ej. "hospitalfricke.cl"), las solicitudes de cuenta exigen correo de ese dominio
-DOMINIO_CORREO = os.environ.get("ECO_DOMINIO_CORREO", "").strip().lower()
+DOMINIO_CORREO = os.environ.get("ECO_DOMINIO_CORREO", EST.get("dominio_correo", "")).strip().lower()
 
 # Jefe superior del servicio: a quien se dirigen las solicitudes de derechos (Ley 21.719 art. 23)
-JEFE_SERVICIO = os.environ.get("ECO_JEFE_SERVICIO", "Director(a) del Hospital Dr. Gustavo Fricke")
+JEFE_SERVICIO = os.environ.get("ECO_JEFE_SERVICIO", EST["jefe_servicio"])
 
 # Ley 21.663: el hospital figura como Operador de Importancia Vital (verificar Res. Ex. 87/2025 en el Diario Oficial).
 # Como OIV, la actualización a ANCI se acorta a 24 h cuando se afecta el servicio esencial y se exige plan de acción.

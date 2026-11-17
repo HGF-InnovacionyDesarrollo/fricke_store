@@ -1,5 +1,8 @@
 # Fricke Store — ecosistema digital del Hospital Dr. Gustavo Fricke
 
+> Este repositorio es la **plataforma común de la red**: el mismo código sirve a cada establecimiento con su propia
+> instalación, marca, usuarios y base de datos (Fricke Store, Marga-Marga Store, …). Ver [docs/RED.md](docs/RED.md).
+
 Portal de acceso único a las soluciones digitales del hospital, con el modelo visual de Google:
 portada con un buscador (que será el **asistente de IA**, hoy maqueteado), **menú de puntos** con los módulos
 del ecosistema y **tarjeta de cuenta** con avatar. Ingreso con **RUT y contraseña**.

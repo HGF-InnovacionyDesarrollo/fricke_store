@@ -1,0 +1,5 @@
+{
+  "nombre": "Red asistencial",
+  "servicio_salud": "Servicio de Salud (completar nombre oficial)",
+  "nota": "Datos comunes a todos los establecimientos. Cada establecimiento tiene su carpeta con establecimiento.json y marca/."
+}
