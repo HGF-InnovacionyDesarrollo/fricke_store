@@ -5,3 +5,4 @@
 - Antes de crear o cambiar un módulo, leer y seguir `docs/MODULOS.md`. Partir con `python backend/gestionar.py nuevo-modulo`.
 - Lo común a los módulos está en `backend/plataforma.py` (backend) y `frontend/js/cabecera.js` (cabecera).
 - Nunca subir `data/` (bases, claves, respaldos). Cumplimiento normativo en `docs/CUMPLIMIENTO.md`.
+- Diseño: todo módulo sigue `docs/diseno/` (PDF oficiales + resumen en README). Ante dudas, manda el PDF.

@@ -145,6 +145,9 @@ del módulo debe poder ejecutarlas a mano mientras no exista un hook automático
 
 ## 8. Apariencia (marca Fricke Store)
 
+> **Obligatorio:** las [directrices de diseño](diseno/README.md) (PDF de la Unidad de Innovación y Desarrollo) definen el ícono
+> del módulo, la navegación, los componentes y la checklist de aprobación. Prevalecen sobre lo que diga esta sección.
+
 - La página debe cargar `/static/css/base.css`, `/static/css/cabecera.css`, `/static/js/comun.js` y
   `/static/js/cabecera.js`, y arrancar con `iniciarModulo("<clave>")`. Eso pinta la cabecera común (logo actual,
   nombre del módulo, menú de puntos, tarjeta de cuenta), exige sesión, resuelve el primer ingreso, activa el
@@ -180,6 +183,7 @@ del módulo debe poder ejecutarlas a mano mientras no exista un hook automático
 - [ ] Acciones relevantes en la bitácora, sin contenido ni RUT en el detalle.
 - [ ] `exportar_titular` y `depurar` implementados si guarda datos de personas.
 - [ ] Página con la cabecera común, probada en modo oscuro, con teclado y en pantalla angosta.
+- [ ] Cumple la checklist de la Parte 4 de las [directrices de diseño](diseno/README.md) (ícono, interfaz y aprobación).
 - [ ] Respaldo y prueba de restauración (`respaldo.py crear` y `probar`) incluyen su base.
 - [ ] Perfiles que lo verán definidos en *Administración › Módulos* y módulo marcado como activo.
 
