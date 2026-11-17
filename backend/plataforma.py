@@ -207,7 +207,7 @@ def _registrar(m: Manifiesto):
             evento = ("modulo_actualizado", f"{m.clave} v{previo['version'] or '?'} → v{m.version}"
                       + (" · ficha de tratamiento modificada" if ficha_cambio else "")
                       + (" · EIPD vuelve a pendiente" if extra else ""))
-    auditar(*evento)
+    auditar(evento[0], None, evento[1])
 
 
 # ------------------------------------------------------------------ carga

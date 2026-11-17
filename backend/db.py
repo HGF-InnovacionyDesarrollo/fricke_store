@@ -125,7 +125,7 @@ def pool() -> ConnectionPool:
     with _lock_pool:
         if _pool is None:
             _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=20, open=True,
-                                   kwargs={"options": f"-c search_path={ESQUEMA_PORTAL} -c timezone=UTC"},
+                                   kwargs={"options": f"-c search_path={ESQUEMA_PORTAL} -c timezone=UTC", "connect_timeout": 10},
                                    reset=_restablecer)
         return _pool
 

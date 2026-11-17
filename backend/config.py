@@ -8,7 +8,7 @@ DATOS_DIR = BASE_DIR / "data"   # logs, respaldos y claves locales (nunca se ver
 
 # Base de datos PostgreSQL. Desarrollo: docker compose up -d (ver docker-compose.yml).
 # Producción: el servidor del hospital, con TLS (agregar ?sslmode=require) y una contraseña fuera del repositorio.
-DATABASE_URL = os.environ.get("ECO_DATABASE_URL", "postgresql://fricke:fricke_desarrollo@localhost:5432/fricke_store")
+DATABASE_URL = os.environ.get("ECO_DATABASE_URL", "postgresql://fricke:fricke_desarrollo@127.0.0.1:5432/fricke_store")
 ESQUEMA_PORTAL = "portal"          # núcleo; cada módulo usa su propio esquema m_<clave>
 # Base SQLite de las versiones anteriores, solo para trasladar los datos (gestionar.py importar-sqlite)
 SQLITE_ANTERIOR = Path(os.environ.get("ECO_DB", DATOS_DIR / "ecosistema.db"))
