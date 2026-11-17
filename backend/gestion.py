@@ -429,7 +429,7 @@ class Modulo(BaseModel):
     orden: int = 100
     activo: bool = True
     finalidad: str = Field(max_length=500)
-    categorias_datos: str = Field(max_length=500)
+    categorias_datos: str = Field(max_length=1000)
     datos_sensibles: bool = False
     eipd_aprobada: bool = False
     responsable: str = Field(default="", max_length=120)
@@ -472,14 +472,28 @@ def _guardar_modulo(m: Modulo, ctx: Contexto, mid: int | None):
             cols = ", ".join(campos)
             mid = c.execute(f"INSERT INTO modulos ({cols}) VALUES ({', '.join('?' * len(campos))})", tuple(campos.values())).lastrowid
         else:
-            previo = c.execute("SELECT eipd_aprobada FROM modulos WHERE id=?", (mid,)).fetchone()
+            previo = c.execute("SELECT eipd_aprobada, origen, clave FROM modulos WHERE id=?", (mid,)).fetchone()
             if not previo:
                 raise HTTPException(404, "No existe el módulo.")
+            if previo["origen"] == "codigo":
+                # La ficha y la identidad de un módulo con código las define su manifiesto (revisado en el
+                # repositorio). Desde el panel solo se decide quién lo ve, si está activo, el orden y la EIPD.
+                from plataforma import CAMPOS_DE_CODIGO
+                for k in (*CAMPOS_DE_CODIGO, "clave"):
+                    campos.pop(k, None)
+                m.clave = previo["clave"]
             c.execute(f"UPDATE modulos SET {', '.join(f'{k}=?' for k in campos)} WHERE id=?", (*campos.values(), mid))
         c.execute("DELETE FROM modulos_rol WHERE modulo_id=?", (mid,))
         c.executemany("INSERT INTO modulos_rol VALUES (?,?)", [(mid, r) for r in set(m.roles)])
     auditar("modulo_guardado", ctx.u["id"], f"{m.clave} (EIPD {'aprobada' if m.eipd_aprobada else 'pendiente'})", ctx.ip)
     return {"id": mid}
+
+
+@router.get("/api/admin/modulos/registro-tratamiento")
+def registro_tratamiento(ctx: Contexto = Depends(auditoria_o_gestion)):
+    """Fichas de tratamiento completas de los módulos con código (base del Registro de Actividades de Tratamiento)."""
+    from plataforma import fichas
+    return fichas()
 
 
 @router.post("/api/admin/modulos")

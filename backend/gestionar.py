@@ -8,6 +8,12 @@
   python backend/gestionar.py verificar-auditoria
   python backend/gestionar.py archivar-bitacora                  # según ECO_RETENCION_BITACORA_DIAS
   python backend/gestionar.py solicitudes                         # solicitudes de derechos pendientes
+
+Módulos (ver docs/MODULOS.md):
+  python backend/gestionar.py modulos                             # valida, migra y lista los módulos con código
+  python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"   # copia la plantilla
+  python backend/gestionar.py permiso --rut 12.345.678-5 --permiso ejemplo.moderar [--revocar]
+  python backend/gestionar.py depurar                             # aplica los plazos de conservación (a diario)
 """
 import argparse
 import sys
@@ -45,6 +51,15 @@ def main():
     sub.add_parser("verificar-auditoria")
     sub.add_parser("archivar-bitacora", help="archiva lo más antiguo que la retención configurada")
     sub.add_parser("solicitudes")
+    sub.add_parser("modulos")
+    sub.add_parser("depurar", help="aplica el plazo de conservación de cada módulo")
+    nm = sub.add_parser("nuevo-modulo", help="crea modulos/<clave>/ a partir del módulo de ejemplo")
+    nm.add_argument("--clave", required=True)
+    nm.add_argument("--nombre", required=True)
+    pm = sub.add_parser("permiso", help="otorga o revoca un permiso interno de módulo a una persona")
+    pm.add_argument("--rut", required=True)
+    pm.add_argument("--permiso", required=True)
+    pm.add_argument("--revocar", action="store_true")
     a = p.parse_args()
 
     if a.cmd == "crear":
@@ -105,6 +120,66 @@ def main():
             for s in db.execute("SELECT s.*, u.nombre FROM solicitudes_derechos s JOIN usuarios u ON u.id=s.usuario_id "
                                 "WHERE estado IN ('recibida','en_revision') ORDER BY vence"):
                 print(f"#{s['id']} {s['tipo']:<14} {s['nombre']:<28} vence {s['vence']}  {s['detalle'] or ''}")
+
+
+    elif a.cmd == "modulos":
+        import plataforma
+        reg = plataforma.cargar_modulos()
+        with bd() as db:
+            filas = {f["clave"]: f for f in db.execute("SELECT * FROM modulos")}
+        for clave, mod in reg.items():
+            f, m = filas.get(clave), mod.manifiesto
+            estado = ("activo" if f["activo"] else "inactivo") if f else "?"
+            eipd = (" · EIPD " + ("aprobada" if f["eipd_aprobada"] else "PENDIENTE")) if m.tratamiento.datos_sensibles else ""
+            print(f"{clave:<20} v{m.version:<8} {estado:<9} {m.nombre}{eipd}")
+        if not reg:
+            print("No hay módulos con código en modulos/.")
+
+    elif a.cmd == "depurar":
+        import plataforma
+        plataforma.cargar_modulos()
+        print(plataforma.depurar_todos() or "Ningún módulo define depurar().")
+
+    elif a.cmd == "nuevo-modulo":
+        _nuevo_modulo(a.clave, a.nombre)
+
+    elif a.cmd == "permiso":
+        import plataforma
+        reg = plataforma.cargar_modulos()
+        clave_mod = a.permiso.split(".")[0]
+        if clave_mod not in reg or a.permiso not in reg[clave_mod].manifiesto.permisos:
+            sys.exit(f"Permiso desconocido: {a.permiso}")
+        rut = _rut(a.rut)
+        with bd() as db:
+            u = db.execute("SELECT id FROM usuarios WHERE rut=?", (rut,)).fetchone() or sys.exit("No existe.")
+            if a.revocar:
+                db.execute("DELETE FROM permisos_usuario WHERE usuario_id=? AND permiso=?", (u["id"], a.permiso))
+            else:
+                db.execute("INSERT OR IGNORE INTO permisos_usuario (usuario_id, permiso, otorgado_en) VALUES (?,?,?)",
+                           (u["id"], a.permiso, ahora()))
+        auditar("permiso_revocado" if a.revocar else "permiso_otorgado", u["id"], f"{a.permiso} (consola)")
+        print("Listo.")
+
+
+def _nuevo_modulo(clave: str, nombre: str):
+    import re
+    import shutil
+    import config as cfg
+    if not re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", clave) or len(clave) > 40:
+        sys.exit("La clave usa minúsculas, números y _ (ej.: farmacia, control_temperatura).")
+    origen, destino = cfg.MODULOS_DIR / "ejemplo", cfg.MODULOS_DIR / clave
+    if destino.exists():
+        sys.exit(f"Ya existe {destino}.")
+    shutil.copytree(origen, destino, ignore=shutil.ignore_patterns("__pycache__"))
+    for archivo in destino.rglob("*"):
+        if archivo.is_file() and archivo.suffix in (".py", ".js", ".html", ".css", ".sql", ".md"):
+            t = archivo.read_text(encoding="utf-8")
+            t = t.replace('CLAVE = "ejemplo"', f'CLAVE = "{clave}"').replace("/m/ejemplo/", f"/m/{clave}/")
+            t = t.replace('const CLAVE = "ejemplo";', f'const CLAVE = "{clave}";').replace("Tablón de avisos", nombre)
+            archivo.write_text(t, encoding="utf-8")
+    print(f"Módulo creado en {destino}.")
+    print("Siguientes pasos: completa la ficha de tratamiento en manifiesto.py, reemplaza las tablas de "
+          "migraciones/001_inicial.sql y la API de api.py, y revisa la lista de docs/MODULOS.md antes de publicarlo.")
 
 
 if __name__ == "__main__":

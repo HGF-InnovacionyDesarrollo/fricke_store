@@ -6,6 +6,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 DB_PATH = Path(os.environ.get("ECO_DB", BASE_DIR / "data" / "ecosistema.db"))
 
+# Módulos del ecosistema: código en modulos/<clave>/, base propia en data/modulos/<clave>.db
+MODULOS_DIR = BASE_DIR / "modulos"
+MODULOS_DATOS_DIR = Path(os.environ.get("ECO_MODULOS_DATOS", DB_PATH.parent / "modulos"))
+
 # Identidad de la institución (aparece en la portada, el aviso de privacidad y la cuenta)
 NOMBRE_INSTITUCION = os.environ.get("ECO_INSTITUCION", "Hospital Dr. Gustavo Fricke")
 NOMBRE_PRODUCTO = os.environ.get("ECO_PRODUCTO", "Fricke Store")

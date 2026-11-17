@@ -72,15 +72,26 @@ Variables de entorno (ver `backend/config.py`): `ECO_INSTITUCION`, `ECO_PRODUCTO
 
 ## Agregar un módulo
 
-En **Administración › Módulos › Agregar módulo**: nombre, dirección, ícono, color, perfiles que lo ven y su
-**ficha de tratamiento** (finalidad y categorías de datos, obligatorias). Si trata datos de salud, marcar
-*datos sensibles*: no aparecerá en el menú hasta que se marque la evaluación de impacto como aprobada.
+Los módulos viven en `modulos/<clave>/` y siguen las **[directrices para módulos](docs/MODULOS.md)**: comparten el ingreso
+con RUT, la cabecera con el logo, la bitácora encadenada y los respaldos, y declaran su ficha de tratamiento (Ley 21.719).
+
+```bash
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"   # parte desde el módulo de ejemplo
+python backend/gestionar.py modulos                                             # valida, migra y lista
+```
+
+Al reiniciar el portal el módulo se registra solo, **inactivo**. Se publica en **Administración › Módulos** eligiendo quién lo ve.
+Si trata datos de salud, no aparecerá hasta que el DPD apruebe la evaluación de impacto.
+El ejemplo de referencia es `modulos/ejemplo/` (Tablón de avisos).
+
+También se pueden registrar enlaces a sistemas externos desde **Administración › Módulos › Agregar módulo**, con su ficha de tratamiento.
 
 ## Estructura
 
 ```
-backend/   app.py (API y páginas) · gestion.py (solicitudes y administración) · db.py (esquema y bitácora) · seguridad.py (RUT, scrypt, tokens) · gestionar.py · config.py
-frontend/  index.html (portada) · login.html · cuenta.html · admin.html · privacidad.html · css/ · js/ · img/
-docs/      CUMPLIMIENTO.md · HOJA_DE_RUTA.md
-data/      ecosistema.db (no se versiona)
+backend/   app.py (API y páginas) · gestion.py (solicitudes y administración) · plataforma.py (módulos) · db.py (esquema y bitácora) · seguridad.py (RUT, scrypt, tokens) · gestionar.py · config.py
+frontend/  index.html (portada) · login.html · cuenta.html · admin.html · privacidad.html · css/ · js/ (comun.js, cabecera.js) · img/
+modulos/   un módulo por carpeta (ejemplo/ es la plantilla)
+docs/      MODULOS.md (directrices) · CUMPLIMIENTO.md · OPERACION.md · HOJA_DE_RUTA.md
+data/      ecosistema.db y modulos/<clave>.db (no se versiona)
 ```

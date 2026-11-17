@@ -53,39 +53,63 @@ def respaldos() -> list[Path]:
     return sorted(cfg.RESPALDOS_DIR.glob(f"ecosistema-*{SUFIJO}"))
 
 
-def crear() -> Path:
-    inicializar()
-    cfg.RESPALDOS_DIR.mkdir(parents=True, exist_ok=True)
-    sello = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    destino = cfg.RESPALDOS_DIR / f"ecosistema-{sello}{SUFIJO}"
+def _copia_cifrada(origen_db: Path, destino: Path) -> str:
+    """Copia consistente (aunque el portal esté funcionando), comprimida y cifrada, con su huella SHA-256."""
     with tempfile.TemporaryDirectory() as tmp:
         copia = Path(tmp) / "copia.db"
-        origen = sqlite3.connect(cfg.DB_PATH)
+        origen = sqlite3.connect(origen_db)
         dst = sqlite3.connect(copia)
-        origen.backup(dst)  # copia consistente aunque el portal esté funcionando
+        origen.backup(dst)
         dst.close()
         origen.close()
         datos = gzip.compress(copia.read_bytes(), compresslevel=9)
     destino.write_bytes(_clave().encrypt(datos))
     huella = _sha256(destino)
     destino.with_suffix(destino.suffix + ".sha256").write_text(f"{huella}  {destino.name}\n", encoding="utf-8")
+    return huella
+
+
+def bases_modulos() -> list[Path]:
+    return sorted(cfg.MODULOS_DATOS_DIR.glob("*.db")) if cfg.MODULOS_DATOS_DIR.exists() else []
+
+
+def respaldos_modulos(sello: str | None = None) -> list[Path]:
+    return sorted(cfg.RESPALDOS_DIR.glob(f"modulo-*-{sello or '*'}{SUFIJO}"))
+
+
+def crear() -> Path:
+    inicializar()
+    cfg.RESPALDOS_DIR.mkdir(parents=True, exist_ok=True)
+    sello = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    destino = cfg.RESPALDOS_DIR / f"ecosistema-{sello}{SUFIJO}"
+    huella = _copia_cifrada(cfg.DB_PATH, destino)
+    # Cada módulo tiene su base propia (data/modulos/<clave>.db): se respalda con el mismo sello.
+    archivos = [destino]
+    for base in bases_modulos():
+        dm = cfg.RESPALDOS_DIR / f"modulo-{base.stem}-{sello}{SUFIJO}"
+        _copia_cifrada(base, dm)
+        archivos.append(dm)
     externa = ""
     if cfg.RESPALDO_COPIA_EXTERNA:
         try:
             dir_ext = Path(cfg.RESPALDO_COPIA_EXTERNA)
             dir_ext.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(destino, dir_ext / destino.name)
-            shutil.copy2(destino.with_suffix(destino.suffix + ".sha256"), dir_ext)
+            for a in archivos:
+                shutil.copy2(a, dir_ext / a.name)
+                shutil.copy2(a.with_suffix(a.suffix + ".sha256"), dir_ext)
             externa = " · copia externa OK"
         except OSError as e:
             externa = f" · COPIA EXTERNA FALLÓ: {e}"
-    # Rotación local
+    # Rotación local (los respaldos de módulos siguen a los del portal: se borran los de sellos descartados)
     for viejo in respaldos()[:-cfg.RESPALDOS_A_CONSERVAR]:
-        viejo.unlink(missing_ok=True)
-        viejo.with_suffix(viejo.suffix + ".sha256").unlink(missing_ok=True)
+        sello_viejo = viejo.name[len("ecosistema-"):-len(SUFIJO)]
+        for a in [viejo, *respaldos_modulos(sello_viejo)]:
+            a.unlink(missing_ok=True)
+            a.with_suffix(a.suffix + ".sha256").unlink(missing_ok=True)
     guardar_ajuste("ultimo_respaldo", datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    auditar("respaldo_realizado", None, f"{destino.name} sha256 {huella[:16]}…{externa}")
-    print(f"Respaldo creado: {destino} ({destino.stat().st_size // 1024} KB){externa}")
+    modulos = f" + {len(archivos) - 1} módulos" if len(archivos) > 1 else ""
+    auditar("respaldo_realizado", None, f"{destino.name}{modulos} sha256 {huella[:16]}…{externa}")
+    print(f"Respaldo creado: {destino} ({destino.stat().st_size // 1024} KB){modulos}{externa}")
     return destino
 
 
@@ -125,6 +149,14 @@ def probar(archivo: Path | None = None):
             usuarios = conn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
             cadena = _verificar_cadena(conn)
             conn.close()
+            sello = archivo.name[len("ecosistema-"):-len(SUFIJO)]
+            for am in respaldos_modulos(sello):
+                rm = Path(tmp) / am.name
+                _descifrar(am, rm)
+                cm = sqlite3.connect(rm)
+                if cm.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    integridad = f"falla en {am.name}"
+                cm.close()
         except SystemExit as e:
             auditar("respaldo_fallido", None, f"prueba de {archivo.name}: {e}")
             raise

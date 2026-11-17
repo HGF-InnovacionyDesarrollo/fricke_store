@@ -1,0 +1,66 @@
+/* Cabecera común (portada y módulos): barra superior, menú de puntos y tarjeta de cuenta. */
+/* ---------- barra superior ---------- */
+.barra-sup { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 6px 12px 0 16px; height: 60px; }
+.enlaces-sup { display: flex; gap: 15px; margin-right: 8px; }
+.enlaces-sup a { color: var(--texto); font-size: 13px; }
+.btn-avatar { border: 0; background: none; padding: 4px; border-radius: 50%; cursor: pointer; margin-left: 4px; }
+.btn-avatar:hover { background: var(--hover); }
+.btn-avatar .avatar { width: 32px; height: 32px; }
+
+/* ---------- launcher de módulos ---------- */
+.pop-apps { width: 336px; padding: 8px; }
+.apps-tarjeta { background: var(--tarjeta); border-radius: 24px; padding: 16px 12px; min-height: 120px; }
+.apps-grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.app { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 4px 10px; border-radius: 16px; color: var(--texto); text-align: center; font-size: 13px; }
+.app:hover { background: var(--hover); text-decoration: none; }
+.app-icono { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; color: #fff; }
+.app-icono svg { width: 26px; height: 26px; }
+.apps-vacio { text-align: center; padding: 18px 12px 10px; color: var(--texto-2); }
+.apps-vacio .ilus { width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 22px; display: grid; place-items: center; background: var(--acento-suave); color: var(--acento); }
+.apps-vacio .ilus svg { width: 36px; height: 36px; }
+.apps-vacio h3 { margin: 0 0 6px; font-size: 16px; font-weight: 500; color: var(--texto); }
+.apps-vacio p { margin: 0; font-size: 13px; }
+.apps-pie { text-align: center; padding: 12px 8px 6px; font-size: 12.5px; color: var(--texto-2); }
+
+/* ---------- tarjeta de cuenta ---------- */
+.pop-cuenta { width: 410px; max-width: calc(100vw - 16px); padding: 8px 12px 14px; }
+.cuenta-cab { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; }
+.cuenta-rut { grid-column: 2; text-align: center; font-size: 14px; font-weight: 500; color: var(--texto-2); }
+.cuenta-centro { display: flex; flex-direction: column; align-items: center; padding: 10px 0 18px; }
+.cuenta-centro .avatar { margin-bottom: 10px; }
+.cuenta-hola { font-size: 22px; margin: 4px 0 2px; }
+.cuenta-cargo { margin: 0 0 16px; color: var(--texto-2); font-size: 13px; text-align: center; }
+.cuenta-acciones { background: var(--tarjeta); border-radius: 24px; overflow: hidden; }
+.cuenta-acciones button, .cuenta-acciones a {
+  display: flex; align-items: center; gap: 18px; width: 100%; padding: 14px 24px; border: 0; background: none;
+  cursor: pointer; text-align: left; font-size: 14px;
+}
+.cuenta-acciones > * + * { border-top: 2px solid var(--superficie); }
+.cuenta-acciones button:hover, .cuenta-acciones a:hover { background: var(--hover); }
+.cuenta-acciones svg { width: 22px; height: 22px; color: var(--texto-2); }
+.cuenta-acciones small { display: block; font-size: 12px; color: var(--texto-3); }
+.cuenta-pie { text-align: center; font-size: 12px; margin: 14px 0 0; }
+.cuenta-pie a { color: var(--texto-2); }
+.cuenta-acciones a { color: var(--texto); text-decoration: none; }
+
+/* ---------- cabecera dentro de un módulo ---------- */
+.barra-modulo { justify-content: flex-start; border-bottom: 1px solid var(--borde-suave); padding-top: 0; height: 64px; }
+.barra-modulo .espacio { flex: 1; }
+.marca-modulo { display: flex; align-items: center; gap: 14px; color: var(--texto); min-width: 0; }
+.marca-modulo:hover { text-decoration: none; }
+.marca-modulo .logo { font-size: 22px; }
+.marca-modulo .sep { width: 1px; height: 24px; background: var(--borde); }
+.nombre-modulo { font-size: 18px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app.actual { background: var(--primario-suave); }
+
+/* ---------- contenido de un módulo ---------- */
+.modulo-cuerpo { width: min(1080px, 100%); margin: 0 auto; padding: 24px 16px 48px; }
+.sin-acceso { text-align: center; padding: 12vh 16px; color: var(--texto-2); }
+.sin-acceso svg { width: 48px; height: 48px; margin: 0 auto 16px; color: var(--texto-3); }
+.sin-acceso h1 { font-size: 24px; font-weight: 400; color: var(--texto); margin: 0 0 8px; }
+.sin-acceso .btn { margin-top: 16px; }
+
+@media (max-width: 640px) {
+  .enlaces-sup { display: none; }
+  .marca-modulo .logo-texto, .marca-modulo .sep { display: none; }
+}

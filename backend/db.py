@@ -114,6 +114,14 @@ CREATE TABLE IF NOT EXISTS modulos_usuario (
     usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
     PRIMARY KEY (modulo_id, usuario_id)
 );
+-- Permisos internos de un módulo dados a una persona puntual (además de los que trae su perfil).
+CREATE TABLE IF NOT EXISTS permisos_usuario (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    permiso TEXT NOT NULL,                 -- "<clave>.<accion>", declarado en el manifiesto
+    otorgado_por INTEGER REFERENCES usuarios(id),
+    otorgado_en TEXT NOT NULL,
+    PRIMARY KEY (usuario_id, permiso)
+);
 
 -- Ajustes del sistema (contención, último respaldo, ancla de la bitácora, etc.)
 CREATE TABLE IF NOT EXISTS ajustes (
@@ -194,6 +202,10 @@ MIGRACIONES = {
         "prorroga_motivo": "TEXT",
         "respondida_en": "TEXT",
         "respuesta_hash": "TEXT",
+    },
+    "modulos": {
+        "origen": "TEXT NOT NULL DEFAULT 'manual'",   # manual (panel) | codigo (carpeta modulos/)
+        "version": "TEXT",
     },
 }
 

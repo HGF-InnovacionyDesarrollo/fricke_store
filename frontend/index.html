@@ -8,6 +8,7 @@
 <link rel="icon" href="/static/img/favicon-32.png?v=2" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v=2">
 <link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/cabecera.css">
 <link rel="stylesheet" href="/static/css/inicio.css">
 </head>
 <body class="inicio">
@@ -66,32 +67,8 @@
   </div>
 </footer>
 
-<!-- Launcher de módulos -->
-<div class="pop pop-apps oculto" id="pop-apps" role="dialog" aria-label="Módulos del ecosistema">
-  <div class="apps-tarjeta" id="apps-lista"></div>
-</div>
-
-<!-- Tarjeta de cuenta -->
-<div class="pop pop-cuenta oculto" id="pop-cuenta" role="dialog" aria-label="Tu cuenta">
-  <div class="cuenta-cab">
-    <span class="cuenta-rut" id="cuenta-rut"></span>
-    <button class="btn-icono" id="cerrar-cuenta" aria-label="Cerrar"><span data-icono="cerrar"></span></button>
-  </div>
-  <div class="cuenta-centro">
-    <span class="avatar grande" id="avatar-pop"></span>
-    <p class="cuenta-hola" id="cuenta-hola"></p>
-    <p class="cuenta-cargo" id="cuenta-cargo"></p>
-    <a class="btn btn-borde" href="/cuenta">Gestionar tu cuenta</a>
-  </div>
-  <div class="cuenta-acciones">
-    <a id="btn-admin" class="oculto" href="/admin"><span data-icono="escudo"></span><span>Administración<small>Usuarios, solicitudes, módulos y bitácora</small></span></a>
-    <button id="btn-bloquear"><span data-icono="candado"></span><span>Bloquear pantalla<small>Ctrl + Alt + L</small></span></button>
-    <button id="btn-salir"><span data-icono="salir"></span><span>Cerrar sesión</span></button>
-  </div>
-  <p class="cuenta-pie"><a href="/privacidad">Aviso de privacidad</a> · <a href="/cuenta#privacidad">Tus derechos</a></p>
-</div>
-
 <script src="/static/js/comun.js"></script>
+<script src="/static/js/cabecera.js"></script>
 <script src="/static/js/inicio.js"></script>
 </body>
 </html>

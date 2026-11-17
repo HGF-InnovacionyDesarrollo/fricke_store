@@ -368,6 +368,11 @@ ETIQUETAS_ACCION = {
     "respaldo_probado": "Restauración de respaldo probada",
     "respaldo_fallido": "Respaldo o prueba fallida",
     "bitacora_archivada": "Bitácora antigua archivada",
+    "modulo_registrado": "Módulo registrado desde el código",
+    "modulo_actualizado": "Módulo actualizado desde el código",
+    "modulo_depurado": "Datos de un módulo eliminados por plazo de conservación",
+    "permiso_otorgado": "Permiso de módulo otorgado",
+    "permiso_revocado": "Permiso de módulo revocado",
 }
 
 
@@ -416,6 +421,7 @@ def exportar(ctx: Contexto = Depends(sesion_lista)):
                 "SELECT tipo, detalle, estado, creada, vence, respuesta FROM solicitudes_derechos WHERE usuario_id=?", (uid,))],
             "nota": "La contraseña no se incluye: se guarda solo como hash irreversible.",
         }
+    datos["modulos"] = exportar_modulos(uid)
     auditar("datos_exportados", uid, None, ctx.ip)
     return Response(json.dumps(datos, ensure_ascii=False, indent=2), media_type="application/json",
                     headers={"Content-Disposition": 'attachment; filename="mis_datos.json"'})
@@ -458,6 +464,24 @@ def mis_solicitudes(ctx: Contexto = Depends(sesion_lista)):
 from gestion import router as router_gestion  # noqa: E402
 
 app.include_router(router_gestion)
+
+
+# ------------------------------------------------------------------ módulos del ecosistema (carpeta modulos/)
+from plataforma import REGISTRO, acceso, cargar_modulos, exportar_titular as exportar_modulos  # noqa: E402
+
+cargar_modulos(app, sesion_lista, ETIQUETAS_ACCION)
+
+
+@app.get("/api/modulos/{clave}/contexto")
+def contexto_modulo(clave: str, request: Request):
+    """Lo que la cabecera común necesita para pintar un módulo: su identidad y los permisos de la persona."""
+    if clave not in REGISTRO:
+        raise HTTPException(404, "Módulo no encontrado.")
+    ctx = acceso(clave)(sesion_lista(request))
+    m = REGISTRO[clave].manifiesto
+    return {"clave": m.clave, "nombre": m.nombre, "descripcion": m.descripcion, "icono": m.icono,
+            "color": m.color, "version": m.version, "permisos": sorted(ctx.permisos),
+            "datos_sensibles": m.tratamiento.datos_sensibles}
 
 
 # ------------------------------------------------------------------ páginas
