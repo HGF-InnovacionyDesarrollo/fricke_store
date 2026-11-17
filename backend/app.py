@@ -491,6 +491,11 @@ def pagina_admin(request: Request):
     return _pagina("admin.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(cfg.FRONTEND_DIR / "favicon.ico", media_type="image/x-icon")
+
+
 @app.get("/privacidad")
 def pagina_privacidad():
     return _pagina("privacidad.html")
