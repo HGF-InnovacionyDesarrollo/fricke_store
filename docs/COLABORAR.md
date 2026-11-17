@@ -63,7 +63,18 @@ python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --
 Toca solo tu carpeta `modulos/<clave>/` y el ícono generado. Si necesitas cambiar algo común (`backend/`,
 `frontend/`, `docs/`), conversa antes con la Unidad.
 
-## 5. Entrega con un pull request
+## 5. Corre las pruebas
+
+```bash
+pip install -r requirements-dev.txt   # una sola vez
+pytest
+```
+
+Revisan solas que tu módulo cumpla las reglas comunes (sesión, perfiles, ícono, diseño, datos personales) y corren
+las pruebas propias de tu módulo en `modulos/<clave>/tests/`. Si algo falla, el mensaje dice qué regla y en qué
+archivo. GitHub corre lo mismo en cada *pull request*: si falla, no se puede integrar.
+
+## 6. Entrega con un pull request
 
 ```bash
 git add modulos/farmacia docs/logo/modulos/farmacia frontend/img/modulos/farmacia.svg
@@ -89,4 +100,5 @@ te deja comentarios y, cuando esté aprobado, lo integra. Mientras tanto puedes 
 | El portal no arranca: no conecta a la base | Abre Docker Desktop y ejecuta `docker compose up -d` |
 | `nuevo-modulo` no genera los PNG del ícono | Necesita Google Chrome o Microsoft Edge instalado |
 | Tu módulo no aparece en el menú | Revisa `gestionar.py modulos` y actívalo en Administración › Módulos |
+| `pytest` falla al conectar a la base | Abre Docker Desktop: las pruebas crean su propia base desechable |
 | Quedaste fuera por el segundo factor | `python backend/gestionar.py restablecer-mfa --rut 11.111.111-1` |

@@ -26,6 +26,7 @@
 - [ ] `exportar_titular` y `depurar` implementados si guarda datos de personas.
 - [ ] No sube `data/`, contraseñas ni datos reales.
 - [ ] `python backend/gestionar.py modulos` lo carga sin errores.
+- [ ] `pytest` pasa completo y tiene pruebas propias en `modulos/<clave>/tests/`.
 
 ## Capturas
 
