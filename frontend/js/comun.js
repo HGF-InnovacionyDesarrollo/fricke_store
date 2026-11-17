@@ -65,7 +65,8 @@ async function cargarConfig() {
   if (!CONFIG) CONFIG = await fetch("/api/config").then((r) => r.json());
   document.querySelectorAll("[data-cfg]").forEach((el) => { el.textContent = CONFIG[el.dataset.cfg] ?? ""; });
   document.querySelectorAll("[data-logo]").forEach((el) => {
-    el.innerHTML = CONFIG.producto.split(/\s+/).map((p) => `<span class="palabra">${esc(p)}</span>`).join(" ");
+    // isotipo (grilla de módulos con el símbolo del hospital) + nombre con degradado azul → menta
+    el.innerHTML = `<img class="logo-icono" src="/static/img/logo-icono.svg" alt=""><span class="logo-texto">${esc(CONFIG.producto)}</span>`;
     el.setAttribute("aria-label", CONFIG.producto);
   });
   return CONFIG;

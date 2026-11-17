@@ -63,10 +63,19 @@ svg { display: block; fill: currentColor; }
 :focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; }
 
 /* ---------- logotipo ---------- */
-.logo { font-weight: 500; letter-spacing: -.02em; user-select: none; line-height: 1; white-space: pre; }
-/* logotipo de dos palabras: la primera en azul, la siguiente en menta */
-.logo .palabra { color: var(--primario); }
-.logo .palabra + .palabra { color: var(--acento); }
+@font-face { font-family: "Outfit"; src: url("/static/fonts/outfit-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+.logo {
+  display: inline-flex; align-items: center; gap: .28em;
+  font-family: "Outfit", system-ui, sans-serif; font-weight: 500; letter-spacing: -.02em;
+  user-select: none; line-height: 1; white-space: pre;
+}
+.logo-icono { height: .92em; width: auto; flex: none; }
+/* nombre con degradado azul → menta (en modo oscuro toma los tonos claros de las variables) */
+.logo-texto {
+  background: linear-gradient(100deg, var(--primario) 10%, var(--acento) 90%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  padding-bottom: .08em;
+}
 
 /* ---------- botones ---------- */
 .btn {
