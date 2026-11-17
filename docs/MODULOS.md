@@ -188,9 +188,30 @@ del módulo debe poder ejecutarlas a mano mientras no exista un hook automático
 - Nunca se sube `data/` (bases, claves, respaldos).
 - Commits en español con prefijo: `feat(farmacia): …`, `fix(farmacia): …`, `docs: …`.
 
-## 10. Lista antes de publicar un módulo
+## 10. Pruebas y revisión automática
 
-- [ ] `gestionar.py modulos` lo carga sin errores.
+Cada *pull request* pasa por una revisión automática en GitHub (`.github/workflows/revision.yml`). Si falla, no se
+puede integrar. Se corre igual en tu PC antes de entregar:
+
+```bash
+pip install -r requirements-dev.txt
+pytest                      # todo (necesita Docker Desktop abierto)
+pytest modulos/<clave>      # solo tu módulo
+```
+
+- **Reglas comunes** (`tests/test_reglas_modulos.py`): se aplican solas a cada carpeta de `modulos/`, sin escribir
+  nada. Revisan que el módulo cargue; que el nombre y el ícono cumplan las directrices, con todos los archivos y sin el
+  pictograma provisional; que la página use el esqueleto común, sin scripts en línea, sin colores fijos y sin recursos
+  de Internet; que **todo endpoint** exija sesión y respete los perfiles y la suspensión; que `exportar_titular` y
+  `depurar` existan si guarda datos de personas y funcionen; y que las migraciones no toquen el esquema del portal.
+- **Pruebas propias** (`modulos/<clave>/tests/test_modulo.py`): lo que hace el módulo y quién puede hacerlo.
+  `nuevo-modulo` copia las del ejemplo como punto de partida; se adaptan a la API del módulo.
+- **Repositorio** (`tests/test_repositorio.py`): que no se suban `data/`, bases, claves ni secretos.
+- Las pruebas usan una base PostgreSQL desechable (`fricke_pruebas`) que se crea y se borra sola: nunca tocan la de trabajo.
+
+## 11. Lista antes de publicar un módulo
+
+- [ ] `gestionar.py modulos` lo carga sin errores y `pytest` pasa completo (la revisión automática del pull request en verde).
 - [ ] Ficha de tratamiento completa y revisada con el responsable del proceso.
 - [ ] `datos_sensibles` marcado si corresponde, y EIPD aprobada por el DPD.
 - [ ] Todos los endpoints con `acceso(...)` y el permiso más acotado posible.

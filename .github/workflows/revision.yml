@@ -1,0 +1,44 @@
+# Revisión automática de las directrices en cada pull request y en cada cambio a main.
+# Corre las pruebas del portal, las reglas comunes que todo módulo debe cumplir y las pruebas propias de cada
+# módulo, contra una base PostgreSQL desechable. Si algo falla, el pull request no se puede integrar
+# (activar "Require status checks to pass" en la protección de main, con el chequeo "Pruebas y directrices").
+name: Revisión
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: Pruebas y directrices
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: fricke
+          POSTGRES_PASSWORD: fricke_desarrollo
+          POSTGRES_DB: fricke_store
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fricke"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ECO_PRUEBAS_ADMIN_URL: postgresql://fricke:fricke_desarrollo@127.0.0.1:5432/postgres
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+      - name: Pruebas del portal, reglas de módulos y pruebas de cada módulo
+        run: pytest -rf

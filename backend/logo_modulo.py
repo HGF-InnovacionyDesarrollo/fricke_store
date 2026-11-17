@@ -197,6 +197,8 @@ def verificar(n: str, familia: int) -> list[str]:
         errores.append(f"el pictograma va con trazo 2 en {'blanco' if color == BLANCO else 'tinta #2B3440'}.")
     if re.search(r"<text|<filter", svg):
         errores.append("el ícono no lleva texto ni efectos.")
+    if "stroke-dasharray" in svg:
+        errores.append("el pictograma es el provisional de nuevo-modulo: reemplázalo por uno propio (Lucide).")
     faltan = [a.format(n=n) for a in ARCHIVOS if not (DIR_ENTREGA / n / a.format(n=n)).exists()]
     if faltan:
         errores.append(f"faltan archivos de la entrega en docs/logo/modulos/{n}/: {', '.join(faltan)}.")
