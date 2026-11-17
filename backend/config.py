@@ -4,11 +4,19 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
-DB_PATH = Path(os.environ.get("ECO_DB", BASE_DIR / "data" / "ecosistema.db"))
+DATOS_DIR = BASE_DIR / "data"   # logs, respaldos y claves locales (nunca se versiona)
 
-# Módulos del ecosistema: código en modulos/<clave>/, base propia en data/modulos/<clave>.db
+# Base de datos PostgreSQL. Desarrollo: docker compose up -d (ver docker-compose.yml).
+# Producción: el servidor del hospital, con TLS (agregar ?sslmode=require) y una contraseña fuera del repositorio.
+DATABASE_URL = os.environ.get("ECO_DATABASE_URL", "postgresql://fricke:fricke_desarrollo@localhost:5432/fricke_store")
+ESQUEMA_PORTAL = "portal"          # núcleo; cada módulo usa su propio esquema m_<clave>
+# Base SQLite de las versiones anteriores, solo para trasladar los datos (gestionar.py importar-sqlite)
+SQLITE_ANTERIOR = Path(os.environ.get("ECO_DB", DATOS_DIR / "ecosistema.db"))
+
+# Módulos del ecosistema: código en modulos/<clave>/, datos en el esquema m_<clave>
 MODULOS_DIR = BASE_DIR / "modulos"
-MODULOS_DATOS_DIR = Path(os.environ.get("ECO_MODULOS_DATOS", DB_PATH.parent / "modulos"))
+# Cada módulo usa un rol de PostgreSQL propio, dueño solo de su esquema (requiere CREATEROLE)
+ROLES_POR_MODULO = os.environ.get("ECO_ROLES_POR_MODULO", "1") == "1"
 
 # Identidad de la institución (aparece en la portada, el aviso de privacidad y la cuenta)
 NOMBRE_INSTITUCION = os.environ.get("ECO_INSTITUCION", "Hospital Dr. Gustavo Fricke")
@@ -43,15 +51,18 @@ ES_OIV = os.environ.get("ECO_ES_OIV", "1") == "1"
 RETENCION_BITACORA_DIAS = int(os.environ.get("ECO_RETENCION_BITACORA_DIAS", 1825))  # 5 años
 
 # Copia de cada evento de auditoría en JSON por línea, para un SIEM. Vacío para desactivar.
-_siem = os.environ.get("ECO_LOG_SIEM", str(BASE_DIR / "data" / "logs" / "auditoria.jsonl"))
+_siem = os.environ.get("ECO_LOG_SIEM", str(DATOS_DIR / "logs" / "auditoria.jsonl"))
 LOG_SIEM = Path(_siem) if _siem else None
 
 # Respaldos
-RESPALDOS_DIR = Path(os.environ.get("ECO_RESPALDOS_DIR", BASE_DIR / "data" / "respaldos"))
+RESPALDOS_DIR = Path(os.environ.get("ECO_RESPALDOS_DIR", DATOS_DIR / "respaldos"))
 RESPALDO_COPIA_EXTERNA = os.environ.get("ECO_RESPALDO_COPIA", "")      # p. ej. \\servidor\respaldos\fricke
-RESPALDO_CLAVE_ARCHIVO = Path(os.environ.get("ECO_RESPALDO_CLAVE", BASE_DIR / "data" / "respaldo.key"))
+RESPALDO_CLAVE_ARCHIVO = Path(os.environ.get("ECO_RESPALDO_CLAVE", DATOS_DIR / "respaldo.key"))
 RESPALDOS_A_CONSERVAR = int(os.environ.get("ECO_RESPALDOS_CONSERVAR", 30))
 RESPALDO_MAX_HORAS = int(os.environ.get("ECO_RESPALDO_MAX_HORAS", 26))   # alerta si el último es más antiguo
+# Herramientas de PostgreSQL. Con Docker: ECO_PG_DUMP="docker exec -i fricke-db pg_dump" (y lo mismo para pg_restore)
+PG_DUMP = os.environ.get("ECO_PG_DUMP", "pg_dump")
+PG_RESTORE = os.environ.get("ECO_PG_RESTORE", "pg_restore")
 
 # HTTPS (si se definen, servidor.py levanta TLS y el portal envía HSTS)
 TLS_CERT = os.environ.get("ECO_TLS_CERT", "")

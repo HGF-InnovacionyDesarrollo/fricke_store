@@ -1,5 +1,21 @@
 # Operación de Fricke Store
 
+## 0. Base de datos PostgreSQL
+
+- **Producción:** un servidor PostgreSQL 16 o superior del hospital, en la red interna. Crear una base `fricke_store`
+  y un usuario dueño con `CREATEROLE` (crea un rol por módulo) y `CREATEDB` (pruebas de restauración):
+
+```sql
+CREATE ROLE fricke LOGIN PASSWORD '…' CREATEROLE CREATEDB;
+CREATE DATABASE fricke_store OWNER fricke;
+```
+
+- Configurar `ECO_DATABASE_URL=postgresql://fricke:…@servidor-bd:5432/fricke_store?sslmode=require` como variable
+  de entorno del servicio (nunca en el repositorio). Al arrancar, el portal crea sus tablas (esquema `portal`) y las de cada módulo.
+- **Traslado desde SQLite** (una sola vez): `python backend/gestionar.py importar-sqlite`. Copia usuarios, sesiones,
+  solicitudes, módulos, incidentes y la bitácora con sus ids y hashes; al final verifica la cadena.
+- **Desarrollo:** `docker compose up -d` levanta PostgreSQL en `localhost:5432` con la URL por defecto.
+
 Cómo dejar el portal en condiciones de producción. Cubre las brechas técnicas del grupo A del informe normativo
 (`reports/Requisitos normativos Fricke Store.md`): HTTPS (A4), respaldos (A7), monitoreo (A8), contención (A9) y bitácora en UTC con retención (A10).
 
@@ -22,10 +38,13 @@ python backend\servidor.py
 ## 2. Respaldos cifrados (A7) — regla 3-2-1
 
 ```bash
-python backend/respaldo.py crear     # cifrado (Fernet/AES), con huella SHA-256 y rotación
-python backend/respaldo.py probar    # descifra el último, verifica la base y la cadena de la bitácora
-python backend/respaldo.py restaurar ecosistema-AAAAMMDDTHHMMSSZ.db.gz.enc
+python backend/respaldo.py crear     # pg_dump de toda la base, cifrado (Fernet/AES), con huella SHA-256 y rotación
+python backend/respaldo.py probar    # lo restaura en una base temporal, verifica la bitácora y la borra
+python backend/respaldo.py restaurar fricke-AAAAMMDDTHHMMSSZ.dump.gz.enc   # en una base nueva, nunca pisa la actual
 ```
+
+- **Herramientas:** `pg_dump`/`pg_restore` de la misma versión mayor del servidor. Si PostgreSQL corre en Docker:
+  `ECO_PG_DUMP="docker exec -i fricke-db pg_dump"` y `ECO_PG_RESTORE="docker exec -i fricke-db pg_restore"`.
 
 - **Clave:** se genera en `data/respaldo.key` la primera vez. **Guarda una copia fuera del servidor** (bóveda de contraseñas o sobre sellado en Dirección). Sin ella, los respaldos no se pueden abrir.
 - **Copia externa:** `ECO_RESPALDO_COPIA=\\servidor-respaldos\fricke-store` copia cada respaldo a otro equipo.

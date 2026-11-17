@@ -14,6 +14,9 @@ Módulos (ver docs/MODULOS.md):
   python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia"   # copia la plantilla
   python backend/gestionar.py permiso --rut 12.345.678-5 --permiso ejemplo.moderar [--revocar]
   python backend/gestionar.py depurar                             # aplica los plazos de conservación (a diario)
+
+PostgreSQL:
+  python backend/gestionar.py importar-sqlite [--origen data/ecosistema.db]   # traslado único desde la versión SQLite
 """
 import argparse
 import sys
@@ -52,6 +55,8 @@ def main():
     sub.add_parser("archivar-bitacora", help="archiva lo más antiguo que la retención configurada")
     sub.add_parser("solicitudes")
     sub.add_parser("modulos")
+    im = sub.add_parser("importar-sqlite", help="traslada los datos de la base SQLite anterior a PostgreSQL")
+    im.add_argument("--origen", help="ruta del ecosistema.db (por defecto data/ecosistema.db)")
     sub.add_parser("depurar", help="aplica el plazo de conservación de cada módulo")
     nm = sub.add_parser("nuevo-modulo", help="crea modulos/<clave>/ a partir del módulo de ejemplo")
     nm.add_argument("--clave", required=True)
@@ -111,7 +116,7 @@ def main():
     elif a.cmd == "archivar-bitacora":
         import config as cfg
         from db import archivar_auditoria
-        r = archivar_auditoria(cfg.RETENCION_BITACORA_DIAS, cfg.DB_PATH.parent / "archivo_bitacora")
+        r = archivar_auditoria(cfg.RETENCION_BITACORA_DIAS, cfg.DATOS_DIR / "archivo_bitacora")
         print(r)
         print(verificar_auditoria())
 
@@ -140,6 +145,9 @@ def main():
         plataforma.cargar_modulos()
         print(plataforma.depurar_todos() or "Ningún módulo define depurar().")
 
+    elif a.cmd == "importar-sqlite":
+        _importar_sqlite(a.origen)
+
     elif a.cmd == "nuevo-modulo":
         _nuevo_modulo(a.clave, a.nombre)
 
@@ -155,10 +163,55 @@ def main():
             if a.revocar:
                 db.execute("DELETE FROM permisos_usuario WHERE usuario_id=? AND permiso=?", (u["id"], a.permiso))
             else:
-                db.execute("INSERT OR IGNORE INTO permisos_usuario (usuario_id, permiso, otorgado_en) VALUES (?,?,?)",
+                db.execute("INSERT INTO permisos_usuario (usuario_id, permiso, otorgado_en) VALUES (?,?,?) ON CONFLICT DO NOTHING",
                            (u["id"], a.permiso, ahora()))
         auditar("permiso_revocado" if a.revocar else "permiso_otorgado", u["id"], f"{a.permiso} (consola)")
         print("Listo.")
+
+
+TABLAS_PORTAL = ["usuarios", "sesiones", "aceptaciones_aviso", "solicitudes_derechos", "solicitudes_cuenta",
+                 "solicitudes_clave", "modulos", "modulos_rol", "modulos_usuario", "permisos_usuario", "ajustes",
+                 "incidentes", "auditoria"]
+
+
+def _importar_sqlite(origen: str | None):
+    """Copia tal cual (mismos ids y textos) cada tabla del portal desde SQLite. La bitácora conserva su
+    cadena de hashes porque se calculó sobre esos mismos textos. Solo funciona sobre un portal vacío."""
+    import sqlite3
+    from pathlib import Path
+    import config as cfg
+    ruta = Path(origen) if origen else cfg.SQLITE_ANTERIOR
+    if not ruta.exists():
+        sys.exit(f"No existe {ruta}.")
+    with bd() as db:
+        if db.execute("SELECT 1 FROM usuarios LIMIT 1").fetchone() or db.execute("SELECT 1 FROM auditoria LIMIT 1").fetchone():
+            sys.exit("PostgreSQL ya tiene datos: la importación solo se hace una vez, sobre un portal vacío.")
+    src = sqlite3.connect(f"file:{ruta}?mode=ro", uri=True)
+    src.row_factory = sqlite3.Row
+    existentes = {r[0] for r in src.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    resumen = {}
+    with bd() as db:
+        for tabla in TABLAS_PORTAL:
+            if tabla not in existentes:
+                continue
+            destino = {r["column_name"] for r in db.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema=? AND table_name=?",
+                (cfg.ESQUEMA_PORTAL, tabla))}
+            cols = [r[1] for r in src.execute(f"PRAGMA table_info({tabla})") if r[1] in destino]
+            filas = [tuple(f[c] for c in cols) for f in src.execute(f"SELECT {', '.join(cols)} FROM {tabla}")]
+            if filas:
+                db.executemany(f"INSERT INTO {tabla} ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", filas)
+            if "id" in cols:
+                db.execute(f"SELECT setval(pg_get_serial_sequence('{tabla}', 'id'), "
+                           f"GREATEST((SELECT COALESCE(MAX(id), 0) FROM {tabla}), 1))")
+            resumen[tabla] = len(filas)
+    src.close()
+    for t, n in resumen.items():
+        print(f"{t:<22} {n:>7} filas")
+    r = verificar_auditoria()
+    print("Bitácora íntegra tras el traslado." if r["integra"] else f"¡ALERTA! La bitácora no verifica (registro #{r['falla_en_id']}).")
+    auditar("datos_importados_sqlite", None, f"{sum(resumen.values())} filas desde {ruta.name}")
+    print(f"Listo. Conserva {ruta} como respaldo hasta confirmar que todo funciona; después guárdalo cifrado o elimínalo.")
 
 
 def _nuevo_modulo(clave: str, nombre: str):

@@ -2,7 +2,7 @@
 
 Un módulo es una carpeta `modulos/<clave>/` con:
   __init__.py            exporta MANIFIESTO y router (y, opcional, exportar_titular / depurar)
-  migraciones/NNN_*.sql  esquema de su base propia (data/modulos/<clave>.db)
+  migraciones/NNN_*.sql  tablas de su esquema propio en PostgreSQL (m_<clave>)
   frontend/index.html    su página, servida en /m/<clave>/
 
 El portal descubre los módulos al arrancar, valida el manifiesto, aplica las migraciones, los registra
@@ -11,10 +11,8 @@ Las reglas completas están en docs/MODULOS.md.
 """
 from __future__ import annotations
 
-import hashlib
 import importlib
 import re
-import sqlite3
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -26,11 +24,10 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import config as cfg
-from db import ahora, auditar, bd
+from db import ahora, aplicar_migraciones, auditar, bd
 
 CLAVE_VALIDA = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 ACCION_VALIDA = re.compile(r"[a-z][a-z0-9_]{2,60}")
-MIGRACION_VALIDA = re.compile(r"(\d{3})_[a-z0-9_]+\.sql")
 # RUT con o sin puntos (12.345.678-5, 12345678-5): no debe llegar nunca al detalle de la bitácora.
 _PARECE_RUT = re.compile(r"\b\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]\b")
 
@@ -128,59 +125,47 @@ def _validar(m: Manifiesto, carpeta: Path) -> list[str]:
 
 
 # ------------------------------------------------------------------ base de datos del módulo
-def ruta_bd(clave: str) -> Path:
-    return cfg.MODULOS_DATOS_DIR / f"{clave}.db"
+def esquema_de(clave: str) -> str:
+    return f"m_{clave}"
 
 
-def _conectar(clave: str) -> sqlite3.Connection:
-    ruta = ruta_bd(clave)
-    ruta.parent.mkdir(parents=True, exist_ok=True)
-    c = sqlite3.connect(ruta, timeout=10)
-    c.row_factory = sqlite3.Row
-    c.execute("PRAGMA foreign_keys = ON")
-    c.execute("PRAGMA journal_mode = WAL")
-    return c
+def rol_de(clave: str) -> str:
+    return f"fricke_m_{clave}"
+
+
+_ROLES_ACTIVOS: dict[str, str | None] = {}
+
+
+def _preparar_rol(clave: str) -> str | None:
+    """Cada módulo trabaja con un rol propio, dueño solo de su esquema: aunque tenga un error,
+    no puede leer ni modificar las tablas del portal ni las de otro módulo.
+    Si el usuario de la base no puede crear roles, se avisa y se sigue sin aislamiento (solo desarrollo)."""
+    if not cfg.ROLES_POR_MODULO:
+        return None
+    rol = rol_de(clave)
+    try:
+        with bd() as c:
+            if not c.execute("SELECT 1 FROM pg_roles WHERE rolname=?", (rol,)).fetchone():
+                c.execute(f'CREATE ROLE "{rol}" NOLOGIN')
+            c.execute(f'GRANT "{rol}" TO CURRENT_USER')
+        return rol
+    except Exception as e:  # noqa: BLE001
+        print(f"[módulos] '{clave}': sin rol propio ({type(e).__name__}: {e}). "
+              "En producción el usuario de la base debe tener CREATEROLE.", file=sys.stderr)
+        return None
 
 
 @contextmanager
 def bd_modulo(clave: str):
-    """Conexión a la base propia del módulo. Confirma al salir sin error; si hay excepción, revierte."""
-    c = _conectar(clave)
-    try:
+    """Conexión al esquema del módulo (m_<clave>) con su rol. Confirma al salir sin error; si hay excepción, revierte."""
+    with bd(esquema=esquema_de(clave), rol=_ROLES_ACTIVOS.get(clave)) as c:
         yield c
-        c.commit()
-    except Exception:
-        c.rollback()
-        raise
-    finally:
-        c.close()
 
 
 def migrar(clave: str, carpeta: Path) -> list[str]:
-    """Aplica en orden las migraciones pendientes. Una migración ya aplicada no se puede editar:
-    si su contenido cambió, el portal no arranca el módulo (se agrega una migración nueva)."""
-    archivos = sorted(p for p in (carpeta / "migraciones").glob("*.sql") if MIGRACION_VALIDA.fullmatch(p.name))
-    numeros = [int(p.name[:3]) for p in archivos]
-    if numeros != list(range(1, len(numeros) + 1)):
-        raise RuntimeError(f"migraciones de '{clave}' mal numeradas: deben ser 001, 002, 003… sin saltos.")
-    aplicadas = []
-    with bd_modulo(clave) as c:
-        c.execute("CREATE TABLE IF NOT EXISTS _migraciones (version INTEGER PRIMARY KEY, archivo TEXT NOT NULL, "
-                  "sha256 TEXT NOT NULL, aplicada_en TEXT NOT NULL)")
-        hechas = {f["version"]: f for f in c.execute("SELECT * FROM _migraciones")}
-        for p in archivos:
-            v, sql = int(p.name[:3]), p.read_text(encoding="utf-8")
-            huella = hashlib.sha256(sql.encode()).hexdigest()
-            if v in hechas:
-                if hechas[v]["sha256"] != huella:
-                    raise RuntimeError(f"la migración {p.name} de '{clave}' cambió después de aplicarse; "
-                                       "no se editan migraciones aplicadas, se agrega una nueva.")
-                continue
-            c.executescript(f"BEGIN;\n{sql}\nCOMMIT;")
-            c.execute("INSERT INTO _migraciones VALUES (?,?,?,?)", (v, p.name, huella, ahora()))
-            c.commit()
-            aplicadas.append(p.name)
-    return aplicadas
+    """Crea el esquema y el rol del módulo y aplica sus migraciones pendientes (ver db.aplicar_migraciones)."""
+    _ROLES_ACTIVOS[clave] = _preparar_rol(clave)
+    return aplicar_migraciones(esquema_de(clave), carpeta / "migraciones", _ROLES_ACTIVOS[clave])
 
 
 # ------------------------------------------------------------------ registro en el portal

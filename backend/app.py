@@ -289,7 +289,7 @@ def yo(request: Request):
 @app.post("/api/privacidad/aceptar")
 def aceptar_aviso(ctx: Contexto = Depends(sesion)):
     with bd() as c:
-        c.execute("INSERT OR IGNORE INTO aceptaciones_aviso VALUES (?,?,?)", (ctx.u["id"], cfg.VERSION_AVISO, ahora()))
+        c.execute("INSERT INTO aceptaciones_aviso VALUES (?,?,?) ON CONFLICT DO NOTHING", (ctx.u["id"], cfg.VERSION_AVISO, ahora()))
     auditar("aviso_privacidad_leido", ctx.u["id"], cfg.VERSION_AVISO, ctx.ip)
     return {"ok": True}
 
@@ -368,6 +368,7 @@ ETIQUETAS_ACCION = {
     "respaldo_probado": "Restauración de respaldo probada",
     "respaldo_fallido": "Respaldo o prueba fallida",
     "bitacora_archivada": "Bitácora antigua archivada",
+    "datos_importados_sqlite": "Datos trasladados desde la base SQLite anterior",
     "modulo_registrado": "Módulo registrado desde el código",
     "modulo_actualizado": "Módulo actualizado desde el código",
     "modulo_depurado": "Datos de un módulo eliminados por plazo de conservación",
@@ -423,7 +424,7 @@ def exportar(ctx: Contexto = Depends(sesion_lista)):
         }
     datos["modulos"] = exportar_modulos(uid)
     auditar("datos_exportados", uid, None, ctx.ip)
-    return Response(json.dumps(datos, ensure_ascii=False, indent=2), media_type="application/json",
+    return Response(json.dumps(datos, ensure_ascii=False, indent=2, default=str), media_type="application/json",
                     headers={"Content-Disposition": 'attachment; filename="mis_datos.json"'})
 
 

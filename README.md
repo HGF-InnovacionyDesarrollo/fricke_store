@@ -36,8 +36,13 @@ las plantillas para firma del Director, en [docs/plantillas/](docs/plantillas/);
 
 ## Ejecutar
 
+Fricke Store usa **PostgreSQL** (esquema `portal` para el núcleo y uno por módulo). Para desarrollo hay un
+`docker-compose.yml`; en producción se apunta `ECO_DATABASE_URL` al servidor del hospital.
+
 ```bash
+docker compose up -d                # PostgreSQL de desarrollo en localhost:5432
 pip install -r requirements.txt
+python backend/gestionar.py importar-sqlite   # solo una vez, si vienes de la versión con SQLite
 python backend/gestionar.py crear --rut 12.345.678-5 --nombre "Ana Pérez" --cargo "Enfermera" --unidad "UPC" --admin
 python backend/servidor.py          # HTTP 8090; con ECO_TLS_CERT/ECO_TLS_KEY sirve HTTPS
 ```
@@ -66,7 +71,7 @@ python backend/gestionar.py verificar-auditoria
 
 ## Configuración
 
-Variables de entorno (ver `backend/config.py`): `ECO_INSTITUCION`, `ECO_PRODUCTO` (palabra del logotipo),
+Variables de entorno (ver `backend/config.py`): `ECO_DATABASE_URL` (PostgreSQL), `ECO_INSTITUCION`, `ECO_PRODUCTO` (palabra del logotipo),
 `ECO_CORREO_DPD`, `ECO_MESA_AYUDA`, `ECO_INACTIVIDAD_MIN`, `ECO_SESION_MAX_H`, `ECO_COOKIE_SEGURA=1` (con HTTPS), `ECO_VERSION_AVISO`,
 `ECO_DOMINIO_CORREO` (exige correo institucional en las solicitudes), `ECO_LIMITE_PUBLICO` y `ECO_VENTANA_PUBLICO_MIN` (límite de solicitudes por IP).
 
@@ -93,5 +98,5 @@ backend/   app.py (API y páginas) · gestion.py (solicitudes y administración)
 frontend/  index.html (portada) · login.html · cuenta.html · admin.html · privacidad.html · css/ · js/ (comun.js, cabecera.js) · img/
 modulos/   un módulo por carpeta (ejemplo/ es la plantilla)
 docs/      MODULOS.md (directrices) · CUMPLIMIENTO.md · OPERACION.md · HOJA_DE_RUTA.md
-data/      ecosistema.db y modulos/<clave>.db (no se versiona)
+data/      respaldos, logs y claves locales (no se versiona). Los datos viven en PostgreSQL.
 ```

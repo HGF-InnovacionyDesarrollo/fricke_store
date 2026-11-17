@@ -1,10 +1,8 @@
 """API del módulo, montada en /api/m/ejemplo/. Todo endpoint usa Depends(acceso(...))."""
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from plataforma import ContextoModulo, acceso, ahora, bd_modulo, nombres_de
+from plataforma import ContextoModulo, acceso, bd_modulo, nombres_de
 
 from .manifiesto import CLAVE
 
@@ -32,8 +30,8 @@ def listar(ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.ver"))):
 @router.post("/avisos")
 def publicar(d: NuevoAviso, ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.publicar"))):
     with bd_modulo(CLAVE) as c:
-        aid = c.execute("INSERT INTO avisos (autor_id, titulo, texto, creado_en) VALUES (?,?,?,?)",
-                        (ctx.usuario_id, d.titulo.strip(), d.texto.strip(), ahora())).lastrowid
+        aid = c.execute("INSERT INTO avisos (autor_id, titulo, texto) VALUES (?,?,?)",
+                        (ctx.usuario_id, d.titulo.strip(), d.texto.strip())).lastrowid
     # A la bitácora va QUÉ se hizo y sobre qué id, nunca el contenido.
     ctx.auditar(f"{CLAVE}_aviso_publicado", f"aviso #{aid}")
     return {"id": aid}
@@ -63,6 +61,6 @@ def exportar_titular(usuario_id: int) -> dict:
 
 def depurar() -> int:
     """Aplica el plazo de conservación declarado en la ficha. Devuelve cuántos registros eliminó."""
-    limite = (datetime.now(timezone.utc) - timedelta(days=DIAS_CONSERVACION)).isoformat(timespec="seconds")
     with bd_modulo(CLAVE) as c:
-        return c.execute("DELETE FROM avisos WHERE creado_en < ?", (limite,)).rowcount
+        return c.execute("DELETE FROM avisos WHERE creado_en < now() - make_interval(days => ?)",
+                         (DIAS_CONSERVACION,)).rowcount

@@ -91,19 +91,25 @@ MANIFIESTO = Manifiesto(
 
 ## 5. Base de datos
 
-- Cada módulo tiene su **base propia**: `data/modulos/<clave>.db` (SQLite, WAL). Se abre con `bd_modulo(CLAVE)`.
-  **No debe** escribir en la base del portal (`data/ecosistema.db`).
+- El ecosistema usa **una base PostgreSQL**. El núcleo vive en el esquema `portal` y cada módulo en **su propio
+  esquema** `m_<clave>`, creado y administrado por un **rol propio** (`fricke_m_<clave>`). Se abre con `bd_modulo(CLAVE)`,
+  que ya fija el esquema y el rol: el módulo no puede leer ni modificar las tablas del portal ni las de otro módulo.
+- Para datos del portal (nombres de funcionarios, etc.) se usan las funciones de `plataforma.py`, nunca SQL directo.
 - **Migraciones numeradas** `001_…sql`, `002_…sql`, sin saltos. El portal las aplica en orden y guarda la huella
   SHA-256 de cada una. **Una migración aplicada no se edita**: si cambió, el módulo no arranca. Los cambios van
   en una migración nueva. Los archivos no deben incluir `BEGIN`/`COMMIT`: el portal ya los envuelve en una transacción.
+- Tipos de PostgreSQL: `BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY` para ids, `TIMESTAMPTZ` para fechas,
+  `BOOLEAN`, `NUMERIC` para montos, `JSONB` solo si de verdad no hay estructura. Restricciones `NOT NULL`, `CHECK`,
+  `UNIQUE` y llaves foráneas **dentro** del esquema del módulo. Índices para las búsquedas frecuentes.
+- No se nombra el esquema en el SQL (`avisos`, no `m_ejemplo.avisos`): `bd_modulo` ya lo fija.
 - Personas: se guarda `usuarios.id` del portal (p. ej. `autor_id`), **nunca** el RUT, el nombre ni el correo
   copiados. Para mostrar nombres se usa `nombres_de(ids)`.
 - Pacientes: si el módulo los necesita, se guarda lo mínimo y se declara en la ficha. Conviene un identificador
   interno y no el RUT en cada tabla.
-- Fechas en UTC ISO-8601 (`ahora()`); el navegador las muestra en hora de Chile con `fechaLocal()`.
+- Fechas en `TIMESTAMPTZ` (la conexión trabaja en UTC); el navegador las muestra en hora de Chile con `fechaLocal()`.
 - Consultas siempre con parámetros (`?`), nunca armando SQL con texto del usuario.
-- Respaldos: `backend/respaldo.py crear` respalda y cifra también cada base de módulo con el mismo sello,
-  y `probar` verifica su integridad. No hay que hacer nada extra.
+- Respaldos: `backend/respaldo.py crear` hace un `pg_dump` de toda la base (portal y todos los esquemas de módulos),
+  cifrado, y `probar` lo restaura en una base temporal para verificarlo. No hay que hacer nada extra.
 
 ## 6. Bitácora y auditoría
 
@@ -184,7 +190,7 @@ del módulo debe poder ejecutarlas a mano mientras no exista un hook automático
 | `Manifiesto`, `FichaTratamiento` | Declaración del módulo. |
 | `acceso(clave, permiso)` | Dependencia obligatoria de cada endpoint; entrega un `ContextoModulo`. |
 | `ctx.usuario_id`, `ctx.puede(p)`, `ctx.auditar(accion, detalle)` | Persona, permisos y bitácora. |
-| `bd_modulo(clave)` | Conexión a la base propia (confirma al salir, revierte si hay error). |
+| `bd_modulo(clave)` | Conexión al esquema `m_<clave>` con el rol del módulo (confirma al salir, revierte si hay error). |
 | `ahora()` | Fecha y hora UTC ISO-8601. |
 | `nombres_de(ids)` | Nombres de funcionarios para mostrar, sin copiarlos. |
 | `GET /api/modulos/<clave>/contexto` | Identidad del módulo y permisos de la persona (lo usa `iniciarModulo`). |

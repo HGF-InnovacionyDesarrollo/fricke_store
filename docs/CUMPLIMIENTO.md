@@ -78,6 +78,6 @@ Con esos campos se puede generar automáticamente el **Registro de Actividades d
 Además, cada módulo con código ([directrices](MODULOS.md)):
 - declara su ficha completa (finalidad, categorías, titulares, base de licitud, conservación, destinatarios) en un manifiesto revisado en el repositorio; el panel no puede alterarla y, si cambia en un módulo sensible, la EIPD vuelve a pendiente;
 - se registra **inactivo** y su API rechaza el acceso si está suspendido, sin EIPD o sin el permiso interno necesario;
-- guarda sus datos en una base propia, respaldada y cifrada junto con la del portal;
+- guarda sus datos en su propio esquema de PostgreSQL, con un rol que no puede leer los datos del portal ni de otros módulos, respaldado y cifrado junto con el portal;
 - aporta lo que guarda de cada persona a *Descargar mis datos* y elimina lo vencido según su plazo de conservación (`gestionar.py depurar`);
 - registra sus acciones en la bitácora central encadenada, sin contenido ni RUT en el detalle (se rechaza automáticamente).

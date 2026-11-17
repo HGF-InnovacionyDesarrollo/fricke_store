@@ -160,9 +160,9 @@ def resumen(ctx: Contexto = Depends(auditoria_o_gestion)):
             "solicitudes_cuenta": n("SELECT COUNT(*) FROM solicitudes_cuenta WHERE estado='pendiente'"),
             "solicitudes_clave": n("SELECT COUNT(*) FROM solicitudes_clave WHERE estado='pendiente'"),
             "derechos_pendientes": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision')"),
-            "derechos_vencidos": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence < date('now')"),
+            "derechos_vencidos": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence < to_char(CURRENT_DATE, 'YYYY-MM-DD')"),
             "modulos": n("SELECT COUNT(*) FROM modulos"),
-            "fallidos_24h": n("SELECT COUNT(*) FROM auditoria WHERE accion='login_fallido' AND ts > datetime('now','-1 day')"),
+            "fallidos_24h": n("SELECT COUNT(*) FROM auditoria WHERE accion='login_fallido' AND ts::timestamptz > now() - interval '1 day'"),
             "incidentes_abiertos": n("SELECT COUNT(*) FROM incidentes WHERE estado<>'cerrado'"),
             "alertas": alertas_seguridad(c),
             "respaldo": estado_respaldo(),
@@ -177,8 +177,8 @@ def listar_usuarios(q: str = "", ctx: Contexto = Depends(solo_admin)):
     rut_q = re.sub(r"[^0-9kK]", "", q)
     with bd() as c:
         filas = c.execute(
-            """SELECT * FROM usuarios WHERE nombre LIKE ? OR unidad LIKE ? OR cargo LIKE ?
-               OR (? <> '' AND replace(rut,'-','') LIKE ?) ORDER BY activo DESC, nombre LIMIT 300""",
+            """SELECT * FROM usuarios WHERE nombre ILIKE ? OR unidad ILIKE ? OR cargo ILIKE ?
+               OR (? <> '' AND replace(rut,'-','') ILIKE ?) ORDER BY activo DESC, nombre LIMIT 300""",
             (patron, patron, patron, rut_q, f"%{rut_q}%"),
         ).fetchall()
         sesiones = {r[0] for r in c.execute("SELECT DISTINCT usuario_id FROM sesiones")}
@@ -514,7 +514,7 @@ def ver_auditoria(q: str = "", accion: str = "", limite: int = 200, ctx: Context
         filas = c.execute(
             """SELECT a.id, a.ts, a.accion, a.detalle, a.ip, u.nombre, u.rut FROM auditoria a
                LEFT JOIN usuarios u ON u.id=a.usuario_id
-               WHERE (?='' OR a.accion=?) AND (?='' OR u.nombre LIKE ? OR a.detalle LIKE ? OR a.ip LIKE ?)
+               WHERE (?='' OR a.accion=?) AND (?='' OR u.nombre ILIKE ? OR a.detalle ILIKE ? OR a.ip ILIKE ?)
                ORDER BY a.id DESC LIMIT ?""",
             (accion, accion, q, f"%{q}%", f"%{q}%", f"%{q}%", limite),
         ).fetchall()
@@ -565,10 +565,10 @@ def alertas_seguridad(c) -> list[dict]:
         al.append({"nivel": "media", "texto": f"Intentos fallidos desde {ips} direcciones distintas en la última hora."})
     madrugada = c.execute("""SELECT COUNT(*) FROM auditoria a JOIN usuarios u ON u.id=a.usuario_id
                              WHERE a.accion='login' AND u.rol IN ('admin','dpd','seguridad') AND a.ts > ?
-                             AND (CAST(strftime('%H', a.ts) AS INTEGER) + 21) % 24 < 6""", (hace(hours=24),)).fetchone()[0]
+                             AND EXTRACT(HOUR FROM a.ts::timestamptz AT TIME ZONE 'America/Santiago') < 6""", (hace(hours=24),)).fetchone()[0]
     if madrugada:
-        al.append({"nivel": "baja", "texto": f"{madrugada} ingreso(s) de cuentas privilegiadas de madrugada (00:00-06:00, hora de Chile aprox.) en las últimas 24 h."})
-    vencen = c.execute("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence <= date('now','+5 day')").fetchone()[0]
+        al.append({"nivel": "baja", "texto": f"{madrugada} ingreso(s) de cuentas privilegiadas de madrugada (00:00-06:00, hora de Chile) en las últimas 24 h."})
+    vencen = c.execute("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence <= to_char(CURRENT_DATE + 5, 'YYYY-MM-DD')").fetchone()[0]
     if vencen:
         al.append({"nivel": "media", "texto": f"{vencen} solicitud(es) de derechos vencen en 5 días o menos."})
     for inc in c.execute("SELECT * FROM incidentes WHERE estado<>'cerrado'").fetchall():
@@ -733,7 +733,8 @@ def contencion(accion: str, d: Confirmacion, ctx: Contexto = Depends(seguridad_o
         elif accion == "suspender-modulos":
             activos = [r[0] for r in c.execute("SELECT id FROM modulos WHERE activo=1")]
             c.execute("UPDATE modulos SET activo=0")
-            c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('modulos_suspendidos', ?, ?)",
+            c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES ('modulos_suspendidos', ?, ?) "
+                      "ON CONFLICT (clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
                       (",".join(map(str, activos)), ahora()))
             res["modulos"] = len(activos)
         elif accion == "reanudar-modulos":
@@ -742,7 +743,8 @@ def contencion(accion: str, d: Confirmacion, ctx: Contexto = Depends(seguridad_o
             c.execute("DELETE FROM ajustes WHERE clave='modulos_suspendidos'")
             res["modulos"] = len(ids)
         else:
-            c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('formularios_pausados', ?, ?)",
+            c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES ('formularios_pausados', ?, ?) "
+                      "ON CONFLICT (clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
                       ("1" if accion == "pausar-formularios" else "0", ahora()))
     auditar("contencion_" + accion.replace("-", "_"), ctx.u["id"], d.motivo.strip()[:300], ctx.ip)
     return {"ok": True, **res}

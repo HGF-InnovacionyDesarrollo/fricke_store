@@ -11,6 +11,9 @@
 ## Hecho (v0.3, nov 2026)
 - Plataforma de módulos: carpeta `modulos/`, manifiesto con ficha de tratamiento, base y migraciones por módulo, permisos internos, cabecera común, exportación de datos y depuración por plazo. Directrices en `docs/MODULOS.md`.
 
+## Hecho (v0.4, nov 2026)
+- PostgreSQL como base relacional: esquema `portal` y un esquema con rol propio por módulo, migraciones numeradas, traslado desde SQLite y respaldos con `pg_dump`.
+
 ## Próximo
 1. **Asistente de IA real**: búsqueda sobre protocolos y documentos institucionales (RAG). Preferir un modelo que corra en la red del hospital o con contrato que garantice no entrenar con los datos; evaluación de impacto antes de abrirlo. Filtro que detecte RUT o nombres de pacientes antes de enviar la pregunta.
 2. **Notificaciones por correo institucional** (SMTP del hospital) cuando se aprueba una cuenta o se responde una solicitud.
