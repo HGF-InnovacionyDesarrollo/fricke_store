@@ -109,7 +109,13 @@
         <h1>Bitácora</h1>
         <button class="btn btn-borde" id="btn-integridad"><span data-icono="escudo"></span>Verificar integridad</button>
       </div>
-      <div class="campo buscador"><input id="buscar-bitacora" placeholder=" " autocomplete="off"><label for="buscar-bitacora">Filtrar por persona, detalle o IP</label></div>
+      <div class="filtros-bitacora">
+        <div class="campo buscador"><input id="buscar-bitacora" placeholder=" " autocomplete="off"><label for="buscar-bitacora">Filtrar por persona, detalle o IP</label></div>
+        <div class="campo fecha"><input id="desde-bitacora" type="date"><label for="desde-bitacora">Desde</label></div>
+        <div class="campo fecha"><input id="hasta-bitacora" type="date"><label for="hasta-bitacora">Hasta</label></div>
+        <button class="btn btn-texto oculto" id="limpiar-bitacora">Limpiar fechas</button>
+      </div>
+      <p class="nota-bitacora" id="nota-bitacora" aria-live="polite"></p>
       <div class="tabla" id="tabla-bitacora"></div>
     </section>
   </main>

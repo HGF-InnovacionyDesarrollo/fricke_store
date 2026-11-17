@@ -508,17 +508,30 @@ def editar_modulo(mid: int, m: Modulo, ctx: Contexto = Depends(admin_o_dpd)):
 
 # ------------------------------------------------------------------ bitácora
 @router.get("/api/admin/auditoria")
-def ver_auditoria(q: str = "", accion: str = "", limite: int = 200, ctx: Contexto = Depends(auditoria_o_gestion)):
+def ver_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "", limite: int = 200,
+                  ctx: Contexto = Depends(auditoria_o_gestion)):
+    """Bitácora con filtros. `desde` y `hasta` son fechas AAAA-MM-DD en hora de Chile, ambas incluidas."""
     limite = max(1, min(limite, 1000))
+    for f in (desde, hasta):
+        try:
+            if f:
+                date.fromisoformat(f)
+        except ValueError:
+            raise HTTPException(400, "Fecha no válida.")
+    if desde and hasta and desde > hasta:
+        raise HTTPException(400, "La fecha «desde» no puede ser posterior a «hasta».")
     with bd() as c:
         filas = c.execute(
             """SELECT a.id, a.ts, a.accion, a.detalle, a.ip, u.nombre, u.rut FROM auditoria a
                LEFT JOIN usuarios u ON u.id=a.usuario_id
                WHERE (?='' OR a.accion=?) AND (?='' OR u.nombre ILIKE ? OR a.detalle ILIKE ? OR a.ip ILIKE ?)
+                 AND (?='' OR (a.ts::timestamptz AT TIME ZONE 'America/Santiago')::date >= ?::date)
+                 AND (?='' OR (a.ts::timestamptz AT TIME ZONE 'America/Santiago')::date <= ?::date)
                ORDER BY a.id DESC LIMIT ?""",
-            (accion, accion, q, f"%{q}%", f"%{q}%", f"%{q}%", limite),
+            (accion, accion, q, f"%{q}%", f"%{q}%", f"%{q}%", desde, desde or None, hasta, hasta or None, limite),
         ).fetchall()
-    auditar("auditoria_consultada", ctx.u["id"], (q or accion or "sin filtro")[:80], ctx.ip)
+    filtro = " · ".join(x for x in (q, accion, f"desde {desde}" if desde else "", f"hasta {hasta}" if hasta else "") if x)
+    auditar("auditoria_consultada", ctx.u["id"], (filtro or "sin filtro")[:120], ctx.ip)
     return [{**dict(f), "rut": formatear_rut(f["rut"]) if f["rut"] else None,
              "etiqueta": ETIQUETAS_ACCION.get(f["accion"], f["accion"].replace("_", " ").capitalize())} for f in filas]
 

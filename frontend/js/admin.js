@@ -495,6 +495,8 @@ document.addEventListener("click", (e) => {
   // ---------- bitácora
   let tBit;
   $("#buscar-bitacora").addEventListener("input", () => { clearTimeout(tBit); tBit = setTimeout(cargarBitacora, 300); });
+  ["#desde-bitacora", "#hasta-bitacora"].forEach((id) => $(id).addEventListener("change", cargarBitacora));
+  $("#limpiar-bitacora").onclick = () => { $("#desde-bitacora").value = ""; $("#hasta-bitacora").value = ""; cargarBitacora(); };
   $("#btn-integridad").onclick = async () => {
     const r = await api("/api/admin/auditoria/integridad");
     dialogo({
@@ -507,7 +509,16 @@ document.addEventListener("click", (e) => {
     });
   };
   async function cargarBitacora() {
-    const lista = await api(`/api/admin/auditoria?q=${encodeURIComponent($("#buscar-bitacora").value)}&limite=300`);
+    const LIMITE = 500;
+    const desde = $("#desde-bitacora").value, hasta = $("#hasta-bitacora").value;
+    $("#limpiar-bitacora").classList.toggle("oculto", !desde && !hasta);
+    const p = new URLSearchParams({ q: $("#buscar-bitacora").value, desde, hasta, limite: LIMITE });
+    let lista;
+    try { lista = await api(`/api/admin/auditoria?${p}`); }
+    catch (e) { $("#nota-bitacora").textContent = e.message; $("#tabla-bitacora").innerHTML = ""; return; }
+    const rango = desde && hasta ? (desde === hasta ? `del ${fechaLocal(desde, false)}` : `entre el ${fechaLocal(desde, false)} y el ${fechaLocal(hasta, false)}`)
+      : desde ? `desde el ${fechaLocal(desde, false)}` : hasta ? `hasta el ${fechaLocal(hasta, false)}` : "";
+    $("#nota-bitacora").textContent = `${lista.length === LIMITE ? `Mostrando los ${LIMITE} más recientes` : `${lista.length} registro${lista.length === 1 ? "" : "s"}`}${rango ? " " + rango : ""}${lista.length === LIMITE ? ". Acota las fechas para ver el resto." : "."}`;
     const alerta = new Set(["login_fallido", "login_rechazado_bloqueo", "desbloqueo_fallido"]);
     $("#tabla-bitacora").innerHTML = `<div class="tfila cab-tabla t-bitacora"><span>Fecha</span><span>Evento</span><span>Persona</span><span>Detalle</span><span>IP</span></div>` +
       (lista.length ? lista.map((a) => `<div class="tfila t-bitacora">
