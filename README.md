@@ -80,6 +80,8 @@ Variables de entorno (ver `backend/config.py`): `ECO_DATABASE_URL` (PostgreSQL),
 
 ## Agregar un módulo
 
+¿Vas a desarrollar un módulo desde tu PC? Parte por **[docs/COLABORAR.md](docs/COLABORAR.md)**.
+
 Los módulos viven en `modulos/<clave>/` y siguen las **[directrices para módulos](docs/MODULOS.md)**: comparten el ingreso
 con RUT, la cabecera con el logo, la bitácora encadenada y los respaldos, y declaran su ficha de tratamiento (Ley 21.719).
 
