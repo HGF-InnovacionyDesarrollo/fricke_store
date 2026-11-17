@@ -4,6 +4,7 @@
   python backend/gestionar.py restablecer --rut 12.345.678-5     # nueva clave temporal
   python backend/gestionar.py desactivar --rut 12.345.678-5
   python backend/gestionar.py desbloquear --rut 12.345.678-5
+  python backend/gestionar.py restablecer-mfa --rut 12.345.678-5 # perdió el celular (verificar identidad)
   python backend/gestionar.py listar
   python backend/gestionar.py verificar-auditoria
   python backend/gestionar.py archivar-bitacora                  # según ECO_RETENCION_BITACORA_DIAS
@@ -51,7 +52,7 @@ def main():
     c.add_argument("--unidad")
     c.add_argument("--admin", action="store_true")
     c.add_argument("--dpd", action="store_true", help="perfil Delegado de Protección de Datos")
-    for nombre in ("restablecer", "desactivar", "desbloquear"):
+    for nombre in ("restablecer", "desactivar", "desbloquear", "restablecer-mfa"):
         sub.add_parser(nombre).add_argument("--rut", required=True)
     sub.add_parser("listar")
     sub.add_parser("verificar-auditoria")
@@ -96,6 +97,16 @@ def main():
             db.execute("DELETE FROM sesiones WHERE usuario_id=?", (u["id"],))
         auditar("clave_restablecida", u["id"], "consola")
         print(f"Clave temporal: {clave}")
+
+    elif a.cmd == "restablecer-mfa":
+        rut = _rut(a.rut)
+        with bd() as db:
+            u = db.execute("SELECT id FROM usuarios WHERE rut=?", (rut,)).fetchone() or sys.exit("No existe.")
+            db.execute("UPDATE usuarios SET mfa_secreto=NULL, mfa_activo=0, mfa_activado_en=NULL, mfa_ultimo_paso=NULL WHERE id=?", (u["id"],))
+            db.execute("DELETE FROM mfa_respaldo WHERE usuario_id=?", (u["id"],))
+            db.execute("DELETE FROM sesiones WHERE usuario_id=?", (u["id"],))
+        auditar("mfa_restablecido", u["id"], "consola")
+        print("Segundo factor restablecido: lo configurará de nuevo al ingresar.")
 
     elif a.cmd in ("desactivar", "desbloquear"):
         rut = _rut(a.rut)

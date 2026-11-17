@@ -101,6 +101,99 @@ function rutValido(v) {
     activarRut(document.querySelector(".velo"));
   };
 
+
+  // ---------------------------------------------------------------- segundo factor (Microsoft Authenticator)
+  const ladoDer = document.getElementById("form-login");
+  const titulo = document.querySelector(".lado-izq h1"), sub = document.querySelector(".lado-izq .sub");
+
+  function campoCodigo(etiqueta, ayuda) {
+    return `<div class="campo"><input id="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" placeholder=" " maxlength="9" required>
+      <label for="mfa-codigo">${etiqueta}</label><div class="ayuda">${ayuda}</div></div>
+      <div class="zona-error" id="error-mfa"></div>`;
+  }
+  function pieMfa(boton) {
+    return `<div class="acciones"><button type="button" class="btn btn-texto" id="mfa-salir">Usar otra cuenta</button>
+      <button class="btn" id="mfa-enviar">${boton}</button></div>`;
+  }
+  function conectarPie() {
+    document.getElementById("mfa-salir").onclick = () => cerrarSesion();
+    document.getElementById("mfa-codigo").focus();
+  }
+  async function enviarCodigo(ruta, alExito) {
+    const zonaM = document.getElementById("error-mfa"), btn = document.getElementById("mfa-enviar");
+    const codigo = document.getElementById("mfa-codigo").value.trim();
+    if (!codigo) { mostrarErrorEn(zonaM, "Escribe el código."); return; }
+    btn.disabled = true;
+    try { alExito(await api(ruta, { metodo: "POST", datos: { codigo } })); }
+    catch (err) {
+      if (err.status === 401) { location.replace("/ingresar?mfa_fallido=1"); return; }
+      mostrarErrorEn(zonaM, err.message); document.getElementById("mfa-codigo").select();
+    } finally { btn.disabled = false; }
+  }
+
+  function pasoCodigo(nombre) {
+    titulo.textContent = "Verificación en dos pasos";
+    sub.innerHTML = `Hola${nombre ? ", " + esc(nombre) : ""}. Abre <b>Microsoft Authenticator</b> en tu celular y escribe el código de 6 dígitos de ${esc(CONFIG.producto)}.`;
+    ladoDer.innerHTML = campoCodigo("Código de 6 dígitos", "¿Perdiste el celular? Usa uno de tus códigos de respaldo (XXXX-XXXX) o llama a " + esc(CONFIG.mesa_ayuda) + ".")
+      + pieMfa("Verificar");
+    conectarPie();
+    ladoDer.onsubmit = (e) => { e.preventDefault(); enviarCodigo("/api/auth/mfa/verificar", (r) => {
+      if (r.respaldo_usado) {
+        dialogo({ titulo: "Usaste un código de respaldo", cerrable: false,
+          html: `<p class="dlg-texto">Te quedan <b>${r.respaldos_restantes}</b>. Si perdiste el celular, pide a un administrador que restablezca tu segundo factor.</p>`,
+          acciones: [{ texto: "Continuar", valor: true }] }).then(() => location.replace("/"));
+      } else location.replace("/");
+    }); };
+  }
+
+  async function pasoConfigurar(nombre) {
+    titulo.textContent = "Protege tu cuenta";
+    sub.innerHTML = `Hola${nombre ? ", " + esc(nombre) : ""}. Tu cuenta necesita un segundo factor: además de la contraseña, un código de tu celular.`;
+    let datos;
+    try { datos = await api("/api/auth/mfa/configurar"); }
+    catch (err) { ladoDer.innerHTML = `<div class="zona-error"></div>`; mostrarErrorEn(ladoDer.firstChild, err.message); return; }
+    ladoDer.innerHTML = `
+      <ol class="pasos-mfa">
+        <li>Instala <b>Microsoft Authenticator</b> en tu celular (App Store o Google Play).</li>
+        <li>En la app: <b>+</b> › <b>Otra cuenta</b> (o "Cuenta profesional o educativa" › "Escanear código QR") y escanea este código:</li>
+      </ol>
+      <div class="qr-mfa" aria-label="Código QR para Microsoft Authenticator">${datos.qr_svg}</div>
+      <details class="secreto-mfa"><summary>¿No puedes escanear? Escribe la clave a mano</summary>
+        <p>Cuenta: <b>${esc(datos.emisor)}</b> · ${esc(datos.cuenta)}<br>Clave: <code>${esc(datos.secreto)}</code></p></details>
+      <ol class="pasos-mfa" start="3"><li>Escribe el código de 6 dígitos que aparece en la app.</li></ol>
+      ${campoCodigo("Código de 6 dígitos", "El código cambia cada 30 segundos.")}
+      ${pieMfa("Activar")}`;
+    conectarPie();
+    ladoDer.onsubmit = (e) => { e.preventDefault(); enviarCodigo("/api/auth/mfa/configurar", (r) => mostrarRespaldo(r.codigos_respaldo)); };
+  }
+
+  function mostrarRespaldo(codigos) {
+    dialogo({
+      titulo: "Guarda tus códigos de respaldo", cerrable: false,
+      html: `<p class="dlg-texto">Si pierdes o cambias el celular, cada uno de estos códigos te deja entrar <b>una sola vez</b>.
+        Guárdalos en un lugar seguro (no en el mismo celular). No se volverán a mostrar.</p>
+        <div class="codigos-respaldo">${codigos.map((c) => `<code>${esc(c)}</code>`).join("")}</div>`,
+      acciones: [
+        { texto: "Copiar", clase: "btn btn-texto", alHacer: async () => { try { await navigator.clipboard.writeText(codigos.join("\n")); toast("Códigos copiados."); } catch (_) { toast("No se pudo copiar: anótalos."); } return false; } },
+        { texto: "Ya los guardé", valor: true },
+      ],
+    }).then(() => location.replace("/"));
+  }
+
+  async function revisarPendiente(respuestaLogin) {
+    let pendiente = respuestaLogin?.mfa, nombre = "";
+    if (pendiente === undefined) {
+      try { const e = await api("/api/auth/mfa/estado"); pendiente = e.pendiente; nombre = e.nombre; }
+      catch (_) { return false; }
+    }
+    if (pendiente === 1) { pasoCodigo(nombre); return true; }
+    if (pendiente === 2) { await pasoConfigurar(nombre); return true; }
+    return false;
+  }
+  if (new URLSearchParams(location.search).has("mfa_fallido")) mostrarErrorEn(zona, "Demasiados códigos incorrectos. Vuelve a ingresar.");
+  // Si quedó una sesión a medio camino (contraseña correcta, falta el código), retoma ese paso.
+  revisarPendiente();
+
   document.getElementById("form-login").onsubmit = async (e) => {
     e.preventDefault();
     mostrarErrorEn(zona, "");
@@ -109,8 +202,8 @@ function rutValido(v) {
     const btn = document.getElementById("btn-ingresar");
     btn.disabled = true;
     try {
-      await api("/api/auth/login", { metodo: "POST", datos: { rut: rut.value, clave: clave.value } });
-      location.replace("/");
+      const r = await api("/api/auth/login", { metodo: "POST", datos: { rut: rut.value, clave: clave.value } });
+      if (!(await revisarPendiente(r))) location.replace("/");
     } catch (err) {
       mostrarErrorEn(zona, err.message);
       clave.value = ""; clave.focus();

@@ -17,11 +17,14 @@
 ## Hecho (v0.5, nov 2026)
 - Plataforma de la red: una instalación por establecimiento con el mismo código (`establecimientos/<clave>/`), partiendo por Fricke Store y Marga-Marga Store.
 
+## Hecho (v0.6, nov 2026)
+- Bitácora con filtro de fechas y exportación a CSV.
+- Segundo factor con Microsoft Authenticator: obligatorio para perfiles privilegiados y exigible por persona.
+
 ## Próximo
 1. **Asistente de IA real**: búsqueda sobre protocolos y documentos institucionales (RAG). Preferir un modelo que corra en la red del hospital o con contrato que garantice no entrenar con los datos; evaluación de impacto antes de abrirlo. Filtro que detecte RUT o nombres de pacientes antes de enviar la pregunta.
 2. **Notificaciones por correo institucional** (SMTP del hospital) cuando se aprueba una cuenta o se responde una solicitud.
 3. **Registro de Actividades de Tratamiento** en PDF para el DPD, a partir de `/api/admin/modulos/registro-tratamiento`.
 7. **Permisos de módulo desde el panel** (hoy se otorgan por consola con `gestionar.py permiso`).
 4. **Integración con el directorio institucional** (Active Directory/LDAP) para altas y bajas automáticas.
-5. **Segundo factor** (TOTP) para administradores y módulos con datos sensibles.
 6. **Módulos candidatos**: SIMI (prevención de caídas), Monitor de temperatura y humedad, gestión de equipos médicos.

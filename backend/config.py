@@ -87,6 +87,11 @@ ROLES = {
 CLAVE_LARGO_MIN = 15   # NIST SP 800-63B rev. 4 para un solo factor
 CLAVE_LARGO_MAX = 128
 
+# Segundo factor (códigos de Microsoft Authenticator u otra app TOTP).
+# Obligatorio para estos perfiles; un administrador puede exigirlo además a cualquier persona.
+MFA_PERFILES = {p.strip() for p in os.environ.get("ECO_MFA_PERFILES", "admin,dpd,seguridad").split(",") if p.strip()}
+MFA_CLAVE_ARCHIVO = Path(os.environ.get("ECO_MFA_CLAVE", DATOS_DIR / "mfa.key"))  # cifra los secretos; respaldar fuera del servidor
+
 # Versión vigente del aviso de privacidad. Al cambiarla, todos deben volver a leerlo.
 VERSION_AVISO = os.environ.get("ECO_VERSION_AVISO", "2026-11b")
 

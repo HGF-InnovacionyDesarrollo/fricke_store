@@ -134,6 +134,13 @@ document.addEventListener("click", (e) => {
           ${campo("eu-unidad", "Unidad o servicio", u?.unidad || "", 'maxlength="80"')}
           ${selectRol("eu-rol", u?.rol)}
         </div>
+        ${nuevo ? "" : `<p class="subtitulo">Segundo factor (Microsoft Authenticator)</p>
+        <div class="fila-mfa">
+          <span class="chip ${u.mfa_activo ? "ok" : (u.mfa_por_perfil || u.mfa_exigido) ? "alerta" : ""}">${u.mfa_activo ? "Activo" : (u.mfa_por_perfil || u.mfa_exigido) ? "Pendiente: lo configurará al ingresar" : "No activado"}</span>
+          ${u.mfa_por_perfil ? `<small>Obligatorio por su perfil.</small>`
+            : `<label class="check"><input type="checkbox" id="eu-mfa" ${u.mfa_exigido ? "checked" : ""}> Exigir segundo factor a esta persona</label>`}
+          ${u.mfa_activo ? '<button class="btn btn-texto" data-accion="mfa">Restablecer (perdió el celular)</button>' : ""}
+        </div>`}
         ${nuevo ? "" : `<div class="dlg-acciones-extra">
           <button class="btn btn-borde" data-accion="restablecer">Restablecer contraseña</button>
           ${bloqueada ? '<button class="btn btn-borde" data-accion="desbloquear">Desbloquear</button>' : ""}
@@ -146,6 +153,8 @@ document.addEventListener("click", (e) => {
         { texto: nuevo ? "Crear y generar contraseña" : "Guardar cambios", alHacer: async (v) => {
             const val = (id) => v.querySelector(id)?.value.trim();
             const datos = { nombre: val("#eu-nombre"), correo: val("#eu-correo"), cargo: val("#eu-cargo"), unidad: val("#eu-unidad"), rol: val("#eu-rol") };
+            const mfaCheck = v.querySelector("#eu-mfa");
+            if (!nuevo && mfaCheck && mfaCheck.checked !== u.mfa_exigido) datos.mfa_exigido = mfaCheck.checked;
             try {
               if (nuevo) {
                 const r = await api("/api/admin/usuarios", { metodo: "POST", datos: { ...datos, rut: val("#eu-rut") } });
@@ -168,6 +177,9 @@ document.addEventListener("click", (e) => {
           if (!confirm(`¿Restablecer la contraseña de ${u.nombre}? Se cerrarán sus sesiones abiertas.`)) return;
           const r = await api(`/api/admin/usuarios/${u.id}/restablecer`, { metodo: "POST" });
           velo.remove(); mostrarClave({ ...u, ...r });
+        } else if (b.dataset.accion === "mfa") {
+          if (!confirm(`¿Restablecer el segundo factor de ${u.nombre}? Verifica su identidad antes. Se cerrarán sus sesiones y deberá volver a escanear el código QR.`)) return;
+          await api(`/api/admin/usuarios/${u.id}/mfa-restablecer`, { metodo: "POST" }); velo.remove(); toast("Segundo factor restablecido.");
         } else if (b.dataset.accion === "desbloquear") {
           await api(`/api/admin/usuarios/${u.id}/desbloquear`, { metodo: "POST" }); velo.remove(); toast("Cuenta desbloqueada.");
         } else if (b.dataset.accion === "cerrar") {

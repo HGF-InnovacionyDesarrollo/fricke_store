@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 import config as cfg
 from establecimiento import tema_css
 from plazos import sumar_corridos, sumar_habiles
+import mfa
 from db import ahora, auditar, bd, inicializar, verificar_auditoria
 from seguridad import (HASH_SEÑUELO, enmascarar_rut, formatear_rut, hash_clave, hash_token,
                        normalizar_rut, nuevo_token, problemas_clave, verificar_clave)
@@ -71,7 +72,7 @@ class Contexto:
         self.u, self.s, self.ip = usuario, sesion, ip
 
 
-def _sesion(request: Request, permitir_bloqueada=False, tocar=True) -> Contexto:
+def _sesion(request: Request, permitir_bloqueada=False, tocar=True, permitir_mfa=False) -> Contexto:
     token = request.cookies.get(cfg.COOKIE_NOMBRE)
     if not token:
         raise HTTPException(401, "Sesión no iniciada.")
@@ -90,6 +91,8 @@ def _sesion(request: Request, permitir_bloqueada=False, tocar=True) -> Contexto:
         u = c.execute("SELECT * FROM usuarios WHERE id=? AND activo=1", (s["usuario_id"],)).fetchone()
         if not u:
             raise HTTPException(401, "Cuenta deshabilitada.")
+        if s["mfa_pendiente"] and not permitir_mfa:
+            raise HTTPException(401, "Falta el segundo factor.")
         if s["bloqueada"] and not permitir_bloqueada:
             raise HTTPException(423, "Pantalla bloqueada.")
         if tocar and not s["bloqueada"]:
@@ -160,16 +163,105 @@ def login(datos: Login, request: Request, response: Response):
 
         token = nuevo_token()
         now = datetime.now(timezone.utc)
+        # 1 = falta el código de la app · 2 = debe configurar la app (obligatorio y aún sin activar)
+        pendiente = 1 if u["mfa_activo"] else 2 if mfa.exigido(u) else 0
         c.execute(
-            "INSERT INTO sesiones (token_hash, usuario_id, creada, ultima_actividad, expira, ip, navegador) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO sesiones (token_hash, usuario_id, creada, ultima_actividad, expira, ip, navegador, mfa_pendiente) "
+            "VALUES (?,?,?,?,?,?,?,?)",
             (hash_token(token), u["id"], ahora(), ahora(),
              (now + timedelta(hours=cfg.SESION_MAXIMA_HORAS)).isoformat(timespec="seconds"),
-             ip, (request.headers.get("user-agent") or "")[:200]),
+             ip, (request.headers.get("user-agent") or "")[:200], pendiente),
         )
         c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=NULL WHERE id=?", (u["id"],))
-    auditar("login", u["id"], None, ip)
+    auditar("login" if not pendiente else "login_clave_correcta", u["id"],
+            None if not pendiente else ("falta el segundo factor" if pendiente == 1 else "debe configurar el segundo factor"), ip)
     _poner_cookie(response, token, segura=request.url.scheme == "https")
-    return {"ok": True}
+    return {"ok": True, "mfa": pendiente}
+
+
+# ------------------------------------------------------------------ segundo factor (Microsoft Authenticator)
+def _sesion_mfa(request: Request) -> Contexto:
+    return _sesion(request, permitir_mfa=True)
+
+
+@app.get("/api/auth/mfa/estado")
+def mfa_estado(ctx: Contexto = Depends(_sesion_mfa)):
+    return {"pendiente": ctx.s["mfa_pendiente"], "nombre": ctx.u["nombre"].split(" ")[0]}
+
+
+class CodigoMfa(BaseModel):
+    codigo: str = Field(max_length=20)
+
+
+def _mfa_fallido(ctx: Contexto):
+    with bd() as c:
+        n = c.execute("UPDATE sesiones SET mfa_intentos=mfa_intentos+1 WHERE id=? RETURNING mfa_intentos",
+                      (ctx.s["id"],)).fetchone()[0]
+        if n >= mfa.MAX_INTENTOS:
+            c.execute("DELETE FROM sesiones WHERE id=?", (ctx.s["id"],))
+    auditar("mfa_fallido", ctx.u["id"], f"intento {n}" + (" · sesión cerrada" if n >= mfa.MAX_INTENTOS else ""), ctx.ip)
+    if n >= mfa.MAX_INTENTOS:
+        raise HTTPException(401, "Demasiados códigos incorrectos. Vuelve a ingresar.")
+    raise HTTPException(400, "El código no es correcto. Revisa la app e inténtalo de nuevo.")
+
+
+@app.post("/api/auth/mfa/verificar")
+def mfa_verificar(d: CodigoMfa, ctx: Contexto = Depends(_sesion_mfa)):
+    """Segundo paso del ingreso: código de 6 dígitos de la app o un código de respaldo."""
+    if ctx.s["mfa_pendiente"] != 1:
+        raise HTTPException(400, "Esta sesión no espera un código.")
+    paso = mfa.verificar(mfa.descifrar(ctx.u["mfa_secreto"]), d.codigo, ctx.u["mfa_ultimo_paso"])
+    usado_respaldo = False
+    with bd() as c:
+        if paso is None and len(d.codigo.replace("-", "").strip()) == 8:
+            fila = c.execute("UPDATE mfa_respaldo SET usado_en=? WHERE id = (SELECT id FROM mfa_respaldo "
+                             "WHERE usuario_id=? AND codigo_hash=? AND usado_en IS NULL LIMIT 1) RETURNING id",
+                             (ahora(), ctx.u["id"], mfa.hash_respaldo(d.codigo))).fetchone()
+            usado_respaldo = fila is not None
+        if paso is None and not usado_respaldo:
+            pass
+        else:
+            if paso is not None:
+                c.execute("UPDATE usuarios SET mfa_ultimo_paso=? WHERE id=?", (paso, ctx.u["id"]))
+            c.execute("UPDATE sesiones SET mfa_pendiente=0, mfa_intentos=0, ultima_actividad=? WHERE id=?", (ahora(), ctx.s["id"]))
+            quedan = c.execute("SELECT COUNT(*) FROM mfa_respaldo WHERE usuario_id=? AND usado_en IS NULL", (ctx.u["id"],)).fetchone()[0]
+    if paso is None and not usado_respaldo:
+        _mfa_fallido(ctx)
+    auditar("login", ctx.u["id"], "con código de respaldo" if usado_respaldo else "con segundo factor", ctx.ip)
+    return {"ok": True, "respaldo_usado": usado_respaldo, "respaldos_restantes": quedan}
+
+
+@app.get("/api/auth/mfa/configurar")
+def mfa_preparar(ctx: Contexto = Depends(_sesion_mfa)):
+    """Genera el secreto y el QR para escanear con Microsoft Authenticator (solo si aún no está activo)."""
+    if ctx.s["mfa_pendiente"] != 2 or ctx.u["mfa_activo"]:
+        raise HTTPException(400, "El segundo factor ya está configurado.")
+    secreto = mfa.nuevo_secreto()
+    with bd() as c:
+        c.execute("UPDATE usuarios SET mfa_secreto=? WHERE id=?", (mfa.cifrar(secreto), ctx.u["id"]))
+    return {"qr_svg": mfa.qr_svg(mfa.uri(secreto, formatear_rut(ctx.u["rut"]))),
+            "secreto": " ".join(secreto[i:i + 4] for i in range(0, len(secreto), 4)),
+            "emisor": cfg.NOMBRE_PRODUCTO, "cuenta": formatear_rut(ctx.u["rut"])}
+
+
+@app.post("/api/auth/mfa/configurar")
+def mfa_activar(d: CodigoMfa, ctx: Contexto = Depends(_sesion_mfa)):
+    """Confirma la app con un primer código, activa el segundo factor y entrega los códigos de respaldo (una sola vez)."""
+    if ctx.s["mfa_pendiente"] != 2 or ctx.u["mfa_activo"] or not ctx.u["mfa_secreto"]:
+        raise HTTPException(400, "Primero escanea el código QR.")
+    paso = mfa.verificar(mfa.descifrar(ctx.u["mfa_secreto"]), d.codigo, None)
+    if paso is None:
+        _mfa_fallido(ctx)
+    codigos = mfa.nuevos_codigos_respaldo()
+    with bd() as c:
+        c.execute("UPDATE usuarios SET mfa_activo=1, mfa_activado_en=?, mfa_ultimo_paso=? WHERE id=?", (ahora(), paso, ctx.u["id"]))
+        c.execute("DELETE FROM mfa_respaldo WHERE usuario_id=?", (ctx.u["id"],))
+        c.executemany("INSERT INTO mfa_respaldo (usuario_id, codigo_hash) VALUES (?,?)",
+                      [(ctx.u["id"], mfa.hash_respaldo(x)) for x in codigos])
+        c.execute("UPDATE sesiones SET mfa_pendiente=0, mfa_intentos=0, ultima_actividad=? WHERE id=?", (ahora(), ctx.s["id"]))
+    auditar("mfa_activado", ctx.u["id"], None, ctx.ip)
+    auditar("login", ctx.u["id"], "con segundo factor", ctx.ip)
+    return {"ok": True, "codigos_respaldo": codigos}
 
 
 @app.post("/api/auth/logout")
@@ -288,6 +380,8 @@ def yo(request: Request):
         "inactividad_min": cfg.SESION_INACTIVIDAD_MIN,
         "rol_nombre": cfg.ROLES.get(ctx.u["rol"], ctx.u["rol"]),
         "puede_administrar": ctx.u["rol"] in ("admin", "dpd", "seguridad"),
+        "mfa_activo": bool(ctx.u["mfa_activo"]),
+        "mfa_exigido": mfa.exigido(ctx.u),
     }
 
 
@@ -340,6 +434,12 @@ ETIQUETAS_ACCION = {
     "pantalla_desbloqueada": "Pantalla desbloqueada",
     "desbloqueo_fallido": "Desbloqueo fallido",
     "clave_cambiada": "Contraseña cambiada",
+    "login_clave_correcta": "Contraseña correcta, falta el segundo factor",
+    "mfa_fallido": "Código del segundo factor incorrecto",
+    "mfa_activado": "Segundo factor activado (Microsoft Authenticator)",
+    "mfa_restablecido": "Segundo factor restablecido por un administrador",
+    "mfa_exigido": "Segundo factor exigido por un administrador",
+    "mfa_no_exigido": "Segundo factor deja de ser exigido",
     "aviso_privacidad_leido": "Aviso de privacidad revisado",
     "datos_exportados": "Descarga de mis datos",
     "solicitud_derecho": "Solicitud de derechos enviada",
@@ -417,7 +517,8 @@ def exportar(ctx: Contexto = Depends(sesion_lista)):
             "generado_en": ahora(),
             "responsable": cfg.NOMBRE_INSTITUCION,
             "titular": {**_datos_publicos(ctx.u), "cuenta_creada": ctx.u["creado_en"],
-                        "clave_cambiada_en": ctx.u["clave_cambiada_en"]},
+                        "clave_cambiada_en": ctx.u["clave_cambiada_en"],
+                        "segundo_factor_activado_en": ctx.u["mfa_activado_en"]},
             "avisos_privacidad_revisados": [dict(f) for f in c.execute(
                 "SELECT version, aceptado_en FROM aceptaciones_aviso WHERE usuario_id=?", (uid,))],
             "sesiones_activas": [dict(f) for f in c.execute(
@@ -426,7 +527,7 @@ def exportar(ctx: Contexto = Depends(sesion_lista)):
                 "SELECT ts, accion, detalle, ip FROM auditoria WHERE usuario_id=? ORDER BY id", (uid,))],
             "solicitudes_de_derechos": [dict(f) for f in c.execute(
                 "SELECT tipo, detalle, estado, creada, vence, respuesta FROM solicitudes_derechos WHERE usuario_id=?", (uid,))],
-            "nota": "La contraseña no se incluye: se guarda solo como hash irreversible.",
+            "nota": "La contraseña y el secreto del segundo factor no se incluyen: se guardan como hash o cifrados.",
         }
     datos["modulos"] = exportar_modulos(uid)
     auditar("datos_exportados", uid, None, ctx.ip)

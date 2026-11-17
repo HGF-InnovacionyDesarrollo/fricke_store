@@ -144,6 +144,8 @@ def _usuario_dict(u) -> dict:
         "cargo": u["cargo"], "unidad": u["unidad"], "rol": u["rol"], "activo": bool(u["activo"]),
         "debe_cambiar_clave": bool(u["debe_cambiar_clave"]), "bloqueado_hasta": u["bloqueado_hasta"],
         "creado_en": u["creado_en"], "clave_cambiada_en": u["clave_cambiada_en"],
+        "mfa_activo": bool(u["mfa_activo"]), "mfa_exigido": bool(u["mfa_exigido"]),
+        "mfa_por_perfil": u["rol"] in cfg.MFA_PERFILES,
     }
 
 
@@ -228,6 +230,7 @@ class CambiosUsuario(BaseModel):
     unidad: str | None = Field(default=None, max_length=80)
     rol: str | None = None
     activo: bool | None = None
+    mfa_exigido: bool | None = None
 
 
 @router.patch("/api/admin/usuarios/{uid}")
@@ -246,6 +249,8 @@ def editar_usuario(uid: int, d: CambiosUsuario, ctx: Contexto = Depends(solo_adm
         raise HTTPException(400, "El nombre no puede quedar vacío.")
     if "activo" in cambios:
         cambios["activo"] = int(cambios["activo"])
+    if "mfa_exigido" in cambios:
+        cambios["mfa_exigido"] = int(cambios["mfa_exigido"])
     if not cambios:
         return {"ok": True}
     with bd() as c:
@@ -255,7 +260,26 @@ def editar_usuario(uid: int, d: CambiosUsuario, ctx: Contexto = Depends(solo_adm
         c.execute(f"UPDATE usuarios SET {sets} WHERE id=?", (*cambios.values(), uid))
         if cambios.get("activo") == 0 or "rol" in cambios:
             c.execute("DELETE FROM sesiones WHERE usuario_id=?", (uid,))
-    auditar("usuario_editado", uid, f"{', '.join(cambios)} por usuario #{ctx.u['id']}", ctx.ip)
+    if "mfa_exigido" in cambios:
+        auditar("mfa_exigido" if cambios["mfa_exigido"] else "mfa_no_exigido", uid, f"por usuario #{ctx.u['id']}", ctx.ip)
+    otros = [k for k in cambios if k != "mfa_exigido"]
+    if otros:
+        auditar("usuario_editado", uid, f"{', '.join(otros)} por usuario #{ctx.u['id']}", ctx.ip)
+    return {"ok": True}
+
+
+@router.post("/api/admin/usuarios/{uid}/mfa-restablecer")
+def restablecer_mfa(uid: int, ctx: Contexto = Depends(solo_admin)):
+    """Para quien perdió o cambió el celular: borra su configuración; al ingresar la vuelve a crear
+    (si le es obligatoria). Verificar identidad antes, igual que con la contraseña."""
+    with bd() as c:
+        n = c.execute("UPDATE usuarios SET mfa_secreto=NULL, mfa_activo=0, mfa_activado_en=NULL, mfa_ultimo_paso=NULL "
+                      "WHERE id=?", (uid,)).rowcount
+        if not n:
+            raise HTTPException(404, "No existe la cuenta.")
+        c.execute("DELETE FROM mfa_respaldo WHERE usuario_id=?", (uid,))
+        c.execute("DELETE FROM sesiones WHERE usuario_id=?", (uid,))
+    auditar("mfa_restablecido", uid, f"por usuario #{ctx.u['id']}", ctx.ip)
     return {"ok": True}
 
 

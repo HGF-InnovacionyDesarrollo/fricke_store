@@ -123,3 +123,14 @@ python backend/gestionar.py crear --rut ... --nombre "..." --dpd
 ```
 
 Para el delegado de ciberseguridad, créalo como funcionario y asígnale el perfil desde el panel.
+
+## Segundo factor de autenticación (Microsoft Authenticator)
+
+- **Obligatorio** para Administrador, Delegado de Protección de Datos y Delegado de Ciberseguridad (`ECO_MFA_PERFILES`).
+  Un administrador puede **exigirlo** a cualquier otra persona en *Administración › Usuarios › Gestionar*.
+- La primera vez, la persona escanea un QR con Microsoft Authenticator (o cualquier app TOTP) y recibe **8 códigos de respaldo** de un solo uso.
+- Desde entonces, al ingresar se pide la contraseña y luego el código de 6 dígitos. Cinco códigos erróneos cierran el intento.
+- **Si alguien pierde el celular:** verificar su identidad y usar *Restablecer (perdió el celular)* en el panel, o por consola
+  `python backend/gestionar.py restablecer-mfa --rut …`. Volverá a escanear el QR al ingresar.
+- Los secretos se guardan cifrados con `data/<establecimiento>/mfa.key`: **respaldar esa clave fuera del servidor**, igual que la de respaldos.
+  Sin ella, todas las personas deberán volver a configurar su app.
