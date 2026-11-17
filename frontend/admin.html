@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Administración</title>
-<link rel="icon" href="/static/img/icono.svg?v=2" type="image/svg+xml">
-<link rel="icon" href="/static/img/favicon-32.png?v=2" type="image/png" sizes="32x32">
-<link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v=2">
+<link rel="icon" href="/marca/icono.svg" type="image/svg+xml">
+<link rel="icon" href="/marca/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/marca/apple-touch-icon.png">
 <link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/marca/tema.css">
 <link rel="stylesheet" href="/static/css/cuenta.css">
 <link rel="stylesheet" href="/static/css/admin.css">
 </head>
@@ -108,7 +109,14 @@
         <h1>Bitácora</h1>
         <button class="btn btn-borde" id="btn-integridad"><span data-icono="escudo"></span>Verificar integridad</button>
       </div>
-      <div class="campo buscador"><input id="buscar-bitacora" placeholder=" " autocomplete="off"><label for="buscar-bitacora">Filtrar por persona, detalle o IP</label></div>
+      <div class="filtros-bitacora">
+        <div class="campo buscador"><input id="buscar-bitacora" placeholder=" " autocomplete="off"><label for="buscar-bitacora">Filtrar por persona, detalle o IP</label></div>
+        <div class="campo fecha"><input id="desde-bitacora" type="date"><label for="desde-bitacora">Desde</label></div>
+        <div class="campo fecha"><input id="hasta-bitacora" type="date"><label for="hasta-bitacora">Hasta</label></div>
+        <button class="btn btn-texto oculto" id="limpiar-bitacora">Limpiar fechas</button>
+        <button class="btn btn-borde" id="exportar-bitacora" title="Descarga lo filtrado en CSV (se abre en Excel)"><span data-icono="descargar"></span>Exportar</button>
+      </div>
+      <p class="nota-bitacora" id="nota-bitacora" aria-live="polite"></p>
       <div class="tabla" id="tabla-bitacora"></div>
     </section>
   </main>

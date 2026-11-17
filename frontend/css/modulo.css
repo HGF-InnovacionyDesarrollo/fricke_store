@@ -1,0 +1,99 @@
+/* Esqueleto común de los módulos (docs/diseno/, Parte 3). Solo variables de base.css; color plano, sin sombras
+   en la superficie. Riel expandido ≥ 840 px, contraído 600–839 px, barra inferior < 600 px (clases de ancho de Material 3). */
+
+/* ---------- barra superior ---------- */
+.barra-modulo { justify-content: flex-start; gap: 8px; padding: 0 12px 0 8px; height: 64px; }
+.barra-modulo .espacio { flex: 1; }
+/* Ícono + nombre: baldosa 32 px, separación 0,25 × 32 = 8 px, Outfit 500 con altura de mayúsculas 0,4 × 32
+   (Outfit: mayúsculas = 0,7 em → 18,3 px), en tinta y sin degradado. Lleva al inicio del módulo. */
+.logo-modulo { display: inline-flex; align-items: center; gap: 8px; min-width: 0; flex: none; max-width: 40%; padding: 4px 8px; border-radius: 8px; color: var(--texto); }
+.logo-modulo:hover { background: var(--hover); text-decoration: none; }
+.logo-modulo img { width: 32px; height: 32px; flex: none; }
+.nombre-modulo { font: 500 18.3px/1 "Outfit", system-ui, sans-serif; color: var(--texto); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.buscador-modulo {
+  display: flex; align-items: center; gap: 8px; flex: 0 1 640px; min-width: 0; height: 48px; margin-left: 24px;
+  padding: 0 16px; border-radius: 24px; background: var(--superficie); color: var(--texto-2);
+}
+.buscador-modulo:focus-within { background: var(--fondo); box-shadow: var(--sombra-barra); }
+.buscador-modulo input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--texto); font: 16px var(--fuente); }
+.linea { width: 20px; height: 20px; flex: none; fill: none; }   /* de línea: base.css rellena los svg por defecto */
+.btn-icono .linea { width: 20px; height: 20px; }
+.progreso { height: 4px; background: linear-gradient(90deg, var(--primario-suave) 0 0) var(--primario-suave); position: relative; overflow: hidden; }
+.progreso::after { content: ""; position: absolute; inset: 0 60% 0 0; background: var(--primario); animation: progreso 1.1s ease-in-out infinite; }
+@keyframes progreso { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .progreso::after { animation: none; inset: 0; opacity: .5; } }
+
+/* ---------- marco: riel + contenido ---------- */
+.modulo-marco { display: grid; grid-template-columns: auto 1fr; min-height: calc(100vh - 64px); }
+.modulo-marco > main { min-width: 0; padding: 8px 24px 48px; outline: none; }
+.riel { display: flex; flex-direction: column; gap: 4px; width: 256px; padding: 8px 12px; }
+.riel .accion-principal {
+  display: inline-flex; align-items: center; gap: 12px; align-self: flex-start; height: 56px; padding: 0 20px 0 16px; margin: 0 0 12px;
+  border: 0; border-radius: 16px; background: var(--primario-suave); color: var(--texto); font: 500 14px var(--fuente); cursor: pointer;
+}
+.riel .accion-principal:hover { box-shadow: var(--sombra-pop); }
+.destino {
+  display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-radius: 24px;
+  color: var(--texto-2); font-weight: 500; font-size: 14px;
+}
+.destino:hover { background: var(--hover); text-decoration: none; }
+.destino.activo { background: var(--primario-suave); color: var(--texto); }   /* píldora, nunca solo negrita */
+
+/* riel contraído (botón ≡ o 600–839 px): íconos con etiqueta corta debajo */
+.modulo-marco.contraido .riel, .riel-compacto .riel { width: 88px; padding: 8px 4px; align-items: center; }
+.modulo-marco.contraido .riel .accion-principal span { display: none; }
+.modulo-marco.contraido .riel .accion-principal { padding: 0; width: 56px; justify-content: center; align-self: center; }
+.modulo-marco.contraido .destino { flex-direction: column; justify-content: center; gap: 4px; height: 64px; width: 80px; padding: 0; border-radius: 16px; font-size: 12px; }
+.modulo-marco.contraido .destino span { max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 600px) and (max-width: 839px) {
+  .riel { width: 88px; padding: 8px 4px; align-items: center; }
+  .riel .accion-principal span { display: none; }
+  .riel .accion-principal { padding: 0; width: 56px; justify-content: center; align-self: center; }
+  .riel .destino { flex-direction: column; justify-content: center; gap: 4px; height: 64px; width: 80px; padding: 0; border-radius: 16px; font-size: 12px; }
+  .riel .destino span { max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #btn-riel { display: none; }
+}
+
+/* teléfono: barra inferior con los destinos; la acción principal flota abajo a la derecha */
+@media (max-width: 599px) {
+  .modulo-marco { grid-template-columns: 1fr; }
+  .modulo-marco > main { padding: 8px 16px 96px; }
+  .riel {
+    position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; width: auto; height: 72px; flex-direction: row; justify-content: space-around;
+    padding: 4px; gap: 0; background: var(--superficie); border-top: 1px solid var(--borde-suave);
+  }
+  .riel .destino { flex: 1; flex-direction: column; justify-content: center; gap: 2px; height: 64px; padding: 0; border-radius: 16px; font-size: 12px; min-width: 0; }
+  .riel .destino span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .riel .accion-principal { position: fixed; right: 16px; bottom: 88px; margin: 0; width: 56px; padding: 0; justify-content: center; box-shadow: var(--sombra-pop); }
+  .riel .accion-principal span { display: none; }
+  #btn-riel { display: none; }
+  .buscador-modulo { margin-left: 4px; }
+  .nombre-modulo { display: none; }
+}
+
+/* ---------- pestañas (1 o 2 destinos) ---------- */
+.pestanas { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--borde-suave); margin: 0 0 16px; }
+.pestanas .destino { border-radius: 24px 24px 0 0; }
+.pestanas #accion-principal { margin-left: auto; }
+
+/* ---------- contenido ---------- */
+.cabecera-pantalla { display: flex; align-items: center; gap: 8px; min-height: 48px; margin: 8px 0 16px; }
+.titulo-pantalla { font-size: 22px; line-height: 28px; font-weight: 400; margin: 0; }    /* sin negrita: manda el tamaño */
+.titulo-seccion { font-size: 16px; line-height: 24px; font-weight: 500; margin: 0 0 8px; }
+.tarjeta { background: var(--fondo); border: 1px solid var(--borde); border-radius: 12px; padding: 16px; }
+.btn-peligro { background: var(--peligro); color: #fff; }
+:root[data-theme="dark"] .btn-peligro { color: #601410; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-peligro { color: #601410; } }
+
+/* ---------- estados ---------- */
+.estado { text-align: center; padding: 48px 16px; color: var(--texto-2); max-width: 480px; margin: 0 auto; }
+.estado .linea { width: 40px; height: 40px; margin: 0 auto 16px; color: var(--texto-3); }
+.estado h2 { font-size: 16px; line-height: 24px; font-weight: 500; color: var(--texto); margin: 0 0 8px; }
+.estado p { margin: 0 0 16px; font-size: 14px; line-height: 20px; }
+.esqueleto { display: grid; gap: 12px; }
+.esqueleto div { height: 52px; border-radius: 12px; background: var(--superficie); }
+
+@media print {
+  .barra-modulo, .riel, .pestanas, .progreso { display: none !important; }
+  .modulo-marco { display: block; }
+}

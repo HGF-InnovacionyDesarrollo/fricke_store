@@ -134,6 +134,13 @@ document.addEventListener("click", (e) => {
           ${campo("eu-unidad", "Unidad o servicio", u?.unidad || "", 'maxlength="80"')}
           ${selectRol("eu-rol", u?.rol)}
         </div>
+        ${nuevo ? "" : `<p class="subtitulo">Segundo factor (Microsoft Authenticator)</p>
+        <div class="fila-mfa">
+          <span class="chip ${u.mfa_activo ? "ok" : (u.mfa_por_perfil || u.mfa_exigido) ? "alerta" : ""}">${u.mfa_activo ? "Activo" : (u.mfa_por_perfil || u.mfa_exigido) ? "Pendiente: lo configurará al ingresar" : "No activado"}</span>
+          ${u.mfa_por_perfil ? `<small>Obligatorio por su perfil.</small>`
+            : `<label class="check"><input type="checkbox" id="eu-mfa" ${u.mfa_exigido ? "checked" : ""}> Exigir segundo factor a esta persona</label>`}
+          ${u.mfa_activo ? '<button class="btn btn-texto" data-accion="mfa">Restablecer (perdió el celular)</button>' : ""}
+        </div>`}
         ${nuevo ? "" : `<div class="dlg-acciones-extra">
           <button class="btn btn-borde" data-accion="restablecer">Restablecer contraseña</button>
           ${bloqueada ? '<button class="btn btn-borde" data-accion="desbloquear">Desbloquear</button>' : ""}
@@ -146,6 +153,8 @@ document.addEventListener("click", (e) => {
         { texto: nuevo ? "Crear y generar contraseña" : "Guardar cambios", alHacer: async (v) => {
             const val = (id) => v.querySelector(id)?.value.trim();
             const datos = { nombre: val("#eu-nombre"), correo: val("#eu-correo"), cargo: val("#eu-cargo"), unidad: val("#eu-unidad"), rol: val("#eu-rol") };
+            const mfaCheck = v.querySelector("#eu-mfa");
+            if (!nuevo && mfaCheck && mfaCheck.checked !== u.mfa_exigido) datos.mfa_exigido = mfaCheck.checked;
             try {
               if (nuevo) {
                 const r = await api("/api/admin/usuarios", { metodo: "POST", datos: { ...datos, rut: val("#eu-rut") } });
@@ -168,6 +177,9 @@ document.addEventListener("click", (e) => {
           if (!confirm(`¿Restablecer la contraseña de ${u.nombre}? Se cerrarán sus sesiones abiertas.`)) return;
           const r = await api(`/api/admin/usuarios/${u.id}/restablecer`, { metodo: "POST" });
           velo.remove(); mostrarClave({ ...u, ...r });
+        } else if (b.dataset.accion === "mfa") {
+          if (!confirm(`¿Restablecer el segundo factor de ${u.nombre}? Verifica su identidad antes. Se cerrarán sus sesiones y deberá volver a escanear el código QR.`)) return;
+          await api(`/api/admin/usuarios/${u.id}/mfa-restablecer`, { metodo: "POST" }); velo.remove(); toast("Segundo factor restablecido.");
         } else if (b.dataset.accion === "desbloquear") {
           await api(`/api/admin/usuarios/${u.id}/desbloquear`, { metodo: "POST" }); velo.remove(); toast("Cuenta desbloqueada.");
         } else if (b.dataset.accion === "cerrar") {
@@ -440,7 +452,8 @@ document.addEventListener("click", (e) => {
       (lista.length ? lista.map((m) => {
         const visible = m.activo && (!m.datos_sensibles || m.eipd_aprobada) && m.roles.length;
         return `<div class="tfila t-modulos">
-          <span class="mod-icono" style="background:${esc(m.color)}">${icono(m.icono) || esc(m.nombre[0])}</span>
+          ${(m.icono || "").startsWith("/static/img/modulos/") ? `<img class="mod-logo" src="${esc(m.icono)}" alt="" width="32" height="32">`
+            : `<span class="mod-icono" style="background:${esc(m.color)}">${icono(m.icono) || esc(m.nombre[0])}</span>`}
           <span>${esc(m.nombre)}<small>${esc(m.url)} · ${m.roles.map((r) => esc(ROLES[r] || r)).join(", ") || "sin perfiles"}</small></span>
           <span>${esc(m.finalidad)}<small>${esc(m.categorias_datos)}</small></span>
           <span class="chips">${visible ? '<span class="chip ok">Visible</span>' : '<span class="chip">Oculto</span>'}${m.datos_sensibles ? `<span class="chip ${m.eipd_aprobada ? "info" : "alerta"}">${m.eipd_aprobada ? "EIPD aprobada" : "EIPD pendiente"}</span>` : ""}</span>
@@ -495,6 +508,23 @@ document.addEventListener("click", (e) => {
   // ---------- bitácora
   let tBit;
   $("#buscar-bitacora").addEventListener("input", () => { clearTimeout(tBit); tBit = setTimeout(cargarBitacora, 300); });
+  ["#desde-bitacora", "#hasta-bitacora"].forEach((id) => $(id).addEventListener("change", cargarBitacora));
+  $("#exportar-bitacora").onclick = async () => {
+    const b = $("#exportar-bitacora");
+    const p = new URLSearchParams({ q: $("#buscar-bitacora").value, desde: $("#desde-bitacora").value, hasta: $("#hasta-bitacora").value });
+    b.disabled = true;
+    try {
+      const r = await fetch(`/api/admin/auditoria/exportar?${p}`, { credentials: "same-origin" });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || "No se pudo exportar."); }
+      const nombre = (r.headers.get("content-disposition") || "").match(/filename="([^"]+)"/)?.[1] || "bitacora.csv";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(await r.blob()); a.download = nombre; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast("Bitácora exportada. La descarga quedó registrada.");
+    } catch (e) { toast(e.message); }
+    finally { b.disabled = false; }
+  };
+  $("#limpiar-bitacora").onclick = () => { $("#desde-bitacora").value = ""; $("#hasta-bitacora").value = ""; cargarBitacora(); };
   $("#btn-integridad").onclick = async () => {
     const r = await api("/api/admin/auditoria/integridad");
     dialogo({
@@ -507,7 +537,16 @@ document.addEventListener("click", (e) => {
     });
   };
   async function cargarBitacora() {
-    const lista = await api(`/api/admin/auditoria?q=${encodeURIComponent($("#buscar-bitacora").value)}&limite=300`);
+    const LIMITE = 500;
+    const desde = $("#desde-bitacora").value, hasta = $("#hasta-bitacora").value;
+    $("#limpiar-bitacora").classList.toggle("oculto", !desde && !hasta);
+    const p = new URLSearchParams({ q: $("#buscar-bitacora").value, desde, hasta, limite: LIMITE });
+    let lista;
+    try { lista = await api(`/api/admin/auditoria?${p}`); }
+    catch (e) { $("#nota-bitacora").textContent = e.message; $("#tabla-bitacora").innerHTML = ""; return; }
+    const rango = desde && hasta ? (desde === hasta ? `del ${fechaLocal(desde, false)}` : `entre el ${fechaLocal(desde, false)} y el ${fechaLocal(hasta, false)}`)
+      : desde ? `desde el ${fechaLocal(desde, false)}` : hasta ? `hasta el ${fechaLocal(hasta, false)}` : "";
+    $("#nota-bitacora").textContent = `${lista.length === LIMITE ? `Mostrando los ${LIMITE} más recientes` : `${lista.length} registro${lista.length === 1 ? "" : "s"}`}${rango ? " " + rango : ""}${lista.length === LIMITE ? ". Acota las fechas para ver el resto." : "."}`;
     const alerta = new Set(["login_fallido", "login_rechazado_bloqueo", "desbloqueo_fallido"]);
     $("#tabla-bitacora").innerHTML = `<div class="tfila cab-tabla t-bitacora"><span>Fecha</span><span>Evento</span><span>Persona</span><span>Detalle</span><span>IP</span></div>` +
       (lista.length ? lista.map((a) => `<div class="tfila t-bitacora">

@@ -72,3 +72,12 @@ Con esos campos se puede generar automáticamente el **Registro de Actividades d
 | A9 | Botones de contención | **Listo** |
 | A10 | Bitácora en UTC, NTP y retención | **Listo en el código** · falta configurar NTP con SHOA en el servidor |
 | A11 | Contrato antes de conectar un LLM externo | Sin cambios: el asistente sigue siendo una maqueta local |
+
+## Módulos con código (`modulos/`)
+
+Además, cada módulo con código ([directrices](MODULOS.md)):
+- declara su ficha completa (finalidad, categorías, titulares, base de licitud, conservación, destinatarios) en un manifiesto revisado en el repositorio; el panel no puede alterarla y, si cambia en un módulo sensible, la EIPD vuelve a pendiente;
+- se registra **inactivo** y su API rechaza el acceso si está suspendido, sin EIPD o sin el permiso interno necesario;
+- guarda sus datos en su propio esquema de PostgreSQL, con un rol que no puede leer los datos del portal ni de otros módulos, respaldado y cifrado junto con el portal;
+- aporta lo que guarda de cada persona a *Descargar mis datos* y elimina lo vencido según su plazo de conservación (`gestionar.py depurar`);
+- registra sus acciones en la bitácora central encadenada, sin contenido ni RUT en el detalle (se rechaza automáticamente).

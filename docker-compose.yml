@@ -1,0 +1,25 @@
+# PostgreSQL para DESARROLLO en el PC (en producción, el servidor de cada hospital).
+# Aloja una base por establecimiento: fricke_store, marga_marga_store, … (docker exec fricke-db createdb -U fricke <clave>_store)
+#   docker compose up -d        # levanta la base en localhost:5432
+#   docker compose down         # la detiene (los datos quedan en el volumen fricke-pg)
+# La contraseña de aquí es solo para desarrollo; en producción va en ECO_DATABASE_URL fuera del repositorio.
+services:
+  db:
+    image: postgres:17
+    container_name: fricke-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fricke_store
+      POSTGRES_USER: fricke
+      POSTGRES_PASSWORD: fricke_desarrollo
+      TZ: UTC
+    ports:
+      - "127.0.0.1:5432:5432"   # solo accesible desde este PC
+    volumes:
+      - fricke-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fricke -d fricke_store"]
+      interval: 5s
+      retries: 10
+volumes:
+  fricke-pg:

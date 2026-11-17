@@ -1,5 +1,8 @@
 # Fricke Store — ecosistema digital del Hospital Dr. Gustavo Fricke
 
+> Este repositorio es la **plataforma común de la red**: el mismo código sirve a cada establecimiento con su propia
+> instalación, marca, usuarios y base de datos (Fricke Store, Marga-Marga Store, …). Ver [docs/RED.md](docs/RED.md).
+
 Portal de acceso único a las soluciones digitales del hospital, con el modelo visual de Google:
 portada con un buscador (que será el **asistente de IA**, hoy maqueteado), **menú de puntos** con los módulos
 del ecosistema y **tarjeta de cuenta** con avatar. Ingreso con **RUT y contraseña**.
@@ -36,8 +39,13 @@ las plantillas para firma del Director, en [docs/plantillas/](docs/plantillas/);
 
 ## Ejecutar
 
+Fricke Store usa **PostgreSQL** (esquema `portal` para el núcleo y uno por módulo). Para desarrollo hay un
+`docker-compose.yml`; en producción se apunta `ECO_DATABASE_URL` al servidor del hospital.
+
 ```bash
+docker compose up -d                # PostgreSQL de desarrollo en localhost:5432
 pip install -r requirements.txt
+python backend/gestionar.py importar-sqlite   # solo una vez, si vienes de la versión con SQLite
 python backend/gestionar.py crear --rut 12.345.678-5 --nombre "Ana Pérez" --cargo "Enfermera" --unidad "UPC" --admin
 python backend/servidor.py          # HTTP 8090; con ECO_TLS_CERT/ECO_TLS_KEY sirve HTTPS
 ```
@@ -66,21 +74,34 @@ python backend/gestionar.py verificar-auditoria
 
 ## Configuración
 
-Variables de entorno (ver `backend/config.py`): `ECO_INSTITUCION`, `ECO_PRODUCTO` (palabra del logotipo),
+Variables de entorno (ver `backend/config.py`): `ECO_DATABASE_URL` (PostgreSQL), `ECO_INSTITUCION`, `ECO_PRODUCTO` (palabra del logotipo),
 `ECO_CORREO_DPD`, `ECO_MESA_AYUDA`, `ECO_INACTIVIDAD_MIN`, `ECO_SESION_MAX_H`, `ECO_COOKIE_SEGURA=1` (con HTTPS), `ECO_VERSION_AVISO`,
 `ECO_DOMINIO_CORREO` (exige correo institucional en las solicitudes), `ECO_LIMITE_PUBLICO` y `ECO_VENTANA_PUBLICO_MIN` (límite de solicitudes por IP).
 
 ## Agregar un módulo
 
-En **Administración › Módulos › Agregar módulo**: nombre, dirección, ícono, color, perfiles que lo ven y su
-**ficha de tratamiento** (finalidad y categorías de datos, obligatorias). Si trata datos de salud, marcar
-*datos sensibles*: no aparecerá en el menú hasta que se marque la evaluación de impacto como aprobada.
+¿Vas a desarrollar un módulo desde tu PC? Parte por **[docs/COLABORAR.md](docs/COLABORAR.md)**.
+
+Los módulos viven en `modulos/<clave>/` y siguen las **[directrices para módulos](docs/MODULOS.md)**: comparten el ingreso
+con RUT, la cabecera con el logo, la bitácora encadenada y los respaldos, y declaran su ficha de tratamiento (Ley 21.719).
+
+```bash
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2   # parte desde el módulo de ejemplo
+python backend/gestionar.py modulos                                             # valida, migra y lista
+```
+
+Al reiniciar el portal el módulo se registra solo, **inactivo**. Se publica en **Administración › Módulos** eligiendo quién lo ve.
+Si trata datos de salud, no aparecerá hasta que el DPD apruebe la evaluación de impacto.
+El ejemplo de referencia es `modulos/ejemplo/` (Tablón de avisos).
+
+También se pueden registrar enlaces a sistemas externos desde **Administración › Módulos › Agregar módulo**, con su ficha de tratamiento.
 
 ## Estructura
 
 ```
-backend/   app.py (API y páginas) · gestion.py (solicitudes y administración) · db.py (esquema y bitácora) · seguridad.py (RUT, scrypt, tokens) · gestionar.py · config.py
-frontend/  index.html (portada) · login.html · cuenta.html · admin.html · privacidad.html · css/ · js/ · img/
-docs/      CUMPLIMIENTO.md · HOJA_DE_RUTA.md
-data/      ecosistema.db (no se versiona)
+backend/   app.py (API y páginas) · gestion.py (solicitudes y administración) · plataforma.py (módulos) · db.py (esquema y bitácora) · seguridad.py (RUT, scrypt, tokens) · gestionar.py · config.py
+frontend/  index.html (portada) · login.html · cuenta.html · admin.html · privacidad.html · css/ · js/ (comun.js, cabecera.js) · img/
+modulos/   un módulo por carpeta (ejemplo/ es la plantilla)
+docs/      MODULOS.md (directrices) · CUMPLIMIENTO.md · OPERACION.md · HOJA_DE_RUTA.md
+data/      respaldos, logs y claves locales (no se versiona). Los datos viven en PostgreSQL.
 ```

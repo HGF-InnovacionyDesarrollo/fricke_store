@@ -1,211 +1,189 @@
-"""Base de datos SQLite y bitácora de auditoría encadenada (a prueba de manipulación)."""
+"""Base de datos PostgreSQL y bitácora de auditoría encadenada (a prueba de manipulación).
+
+Una sola base con un esquema por dueño: "portal" para el núcleo y "m_<clave>" para cada módulo.
+Las consultas se escriben con marcadores `?` (como en el resto del código); `Conexion` los traduce.
+"""
+import atexit
 import hashlib
 import json
-import sqlite3
+import re
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
-from config import DB_PATH
+import psycopg
+from psycopg_pool import ConnectionPool
 
-_lock_auditoria = threading.Lock()
-
-ESQUEMA = """
-CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY,
-    rut TEXT UNIQUE NOT NULL,              -- normalizado: 12345678-5
-    nombre TEXT NOT NULL,
-    correo TEXT,
-    cargo TEXT,
-    unidad TEXT,
-    rol TEXT NOT NULL DEFAULT 'funcionario',  -- funcionario | admin
-    clave_hash TEXT NOT NULL,
-    debe_cambiar_clave INTEGER NOT NULL DEFAULT 1,
-    activo INTEGER NOT NULL DEFAULT 1,
-    intentos_fallidos INTEGER NOT NULL DEFAULT 0,
-    bloqueado_hasta TEXT,
-    clave_cambiada_en TEXT,
-    creado_en TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS sesiones (
-    id INTEGER PRIMARY KEY,
-    token_hash TEXT UNIQUE NOT NULL,       -- nunca se guarda el token en claro
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    creada TEXT NOT NULL,
-    ultima_actividad TEXT NOT NULL,
-    expira TEXT NOT NULL,                  -- límite absoluto (turno)
-    ip TEXT,
-    navegador TEXT,
-    bloqueada INTEGER NOT NULL DEFAULT 0   -- pantalla bloqueada en estación compartida
-);
-
-CREATE TABLE IF NOT EXISTS aceptaciones_aviso (
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    version TEXT NOT NULL,
-    aceptado_en TEXT NOT NULL,
-    PRIMARY KEY (usuario_id, version)
-);
-
-CREATE TABLE IF NOT EXISTS solicitudes_derechos (
-    id INTEGER PRIMARY KEY,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    tipo TEXT NOT NULL,          -- acceso | rectificacion | supresion | oposicion | portabilidad | bloqueo
-    detalle TEXT,
-    estado TEXT NOT NULL DEFAULT 'recibida',  -- recibida | en_revision | respondida | rechazada
-    creada TEXT NOT NULL,
-    vence TEXT NOT NULL,
-    respuesta TEXT
-);
-
--- Solicitudes de cuenta hechas desde la pantalla de ingreso. Un administrador las aprueba.
-CREATE TABLE IF NOT EXISTS solicitudes_cuenta (
-    id INTEGER PRIMARY KEY,
-    rut TEXT NOT NULL,
-    nombre TEXT NOT NULL,
-    correo TEXT,
-    cargo TEXT,
-    unidad TEXT,
-    motivo TEXT,
-    estado TEXT NOT NULL DEFAULT 'pendiente',   -- pendiente | aprobada | rechazada
-    creada TEXT NOT NULL,
-    ip TEXT,
-    resuelta_por INTEGER REFERENCES usuarios(id),
-    resuelta_en TEXT,
-    nota TEXT
-);
-
--- Pedidos de restablecimiento de contraseña (solo se guardan si el RUT existe).
-CREATE TABLE IF NOT EXISTS solicitudes_clave (
-    id INTEGER PRIMARY KEY,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    estado TEXT NOT NULL DEFAULT 'pendiente',   -- pendiente | atendida | descartada
-    creada TEXT NOT NULL,
-    ip TEXT,
-    resuelta_por INTEGER REFERENCES usuarios(id),
-    resuelta_en TEXT
-);
-
--- Catálogo de módulos del ecosistema (vacío por ahora). Se habilitan por rol o por usuario.
-CREATE TABLE IF NOT EXISTS modulos (
-    id INTEGER PRIMARY KEY,
-    clave TEXT UNIQUE NOT NULL,
-    nombre TEXT NOT NULL,
-    descripcion TEXT,
-    url TEXT NOT NULL,
-    icono TEXT,                  -- nombre de icono o ruta a SVG
-    color TEXT,
-    orden INTEGER NOT NULL DEFAULT 100,
-    activo INTEGER NOT NULL DEFAULT 1,
-    -- Ficha de tratamiento: todo módulo declara qué datos usa y para qué antes de publicarse.
-    finalidad TEXT NOT NULL,
-    categorias_datos TEXT NOT NULL,        -- p. ej. "identificación del paciente, signos vitales"
-    datos_sensibles INTEGER NOT NULL DEFAULT 0,   -- datos de salud u otros sensibles
-    eipd_aprobada INTEGER NOT NULL DEFAULT 0,     -- evaluación de impacto aprobada por el DPD
-    responsable TEXT                       -- unidad o persona dueña del módulo
-);
-CREATE TABLE IF NOT EXISTS modulos_rol (
-    modulo_id INTEGER NOT NULL REFERENCES modulos(id),
-    rol TEXT NOT NULL,
-    PRIMARY KEY (modulo_id, rol)
-);
-CREATE TABLE IF NOT EXISTS modulos_usuario (
-    modulo_id INTEGER NOT NULL REFERENCES modulos(id),
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    PRIMARY KEY (modulo_id, usuario_id)
-);
-
--- Ajustes del sistema (contención, último respaldo, ancla de la bitácora, etc.)
-CREATE TABLE IF NOT EXISTS ajustes (
-    clave TEXT PRIMARY KEY,
-    valor TEXT,
-    actualizado TEXT
-);
-
--- Registro de incidentes de seguridad y vulneraciones de datos (Ley 21.663 y Ley 21.719 art. 14 sexies)
-CREATE TABLE IF NOT EXISTS incidentes (
-    id INTEGER PRIMARY KEY,
-    titulo TEXT NOT NULL,
-    descripcion TEXT,
-    detectado_en TEXT NOT NULL,          -- UTC: desde aquí corren los plazos
-    registrado_por INTEGER REFERENCES usuarios(id),
-    registrado_en TEXT NOT NULL,
-    severidad TEXT NOT NULL DEFAULT 'media',   -- baja | media | alta | critica
-    afecta_servicio_esencial INTEGER NOT NULL DEFAULT 0,
-    afecta_datos_personales INTEGER NOT NULL DEFAULT 0,
-    afecta_datos_sensibles INTEGER NOT NULL DEFAULT 0,
-    estado TEXT NOT NULL DEFAULT 'abierto',   -- abierto | contenido | cerrado
-    alerta_anci_en TEXT,
-    actualizacion_anci_en TEXT,
-    informe_final_en TEXT,
-    plan_accion_en TEXT,
-    agencia_notificada_en TEXT,
-    titulares_notificados_en TEXT,
-    cerrado_en TEXT,
-    notas TEXT
-);
-
--- Bitácora: cada fila incluye el hash de la anterior. Si alguien edita o borra una fila,
--- la cadena se rompe y `verificar_auditoria()` lo detecta.
-CREATE TABLE IF NOT EXISTS auditoria (
-    id INTEGER PRIMARY KEY,
-    ts TEXT NOT NULL,
-    usuario_id INTEGER,
-    accion TEXT NOT NULL,
-    detalle TEXT,
-    ip TEXT,
-    hash_anterior TEXT NOT NULL,
-    hash TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ix_auditoria_usuario ON auditoria(usuario_id, id);
-"""
+from config import DATABASE_URL, ESQUEMA_PORTAL, ESTABLECIMIENTO
 
 GENESIS = "0" * 64
+MIGRACIONES_PORTAL = Path(__file__).parent / "migraciones"
+MIGRACION_VALIDA = re.compile(r"(\d{3})_[a-z0-9_]+\.sql")
+_ID_AUDITORIA = 715_001  # llave del candado consultivo que serializa la bitácora entre procesos
 
 
 def ahora() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def conectar() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    c = sqlite3.connect(DB_PATH, timeout=10)
-    c.row_factory = sqlite3.Row
-    c.execute("PRAGMA foreign_keys = ON")
-    c.execute("PRAGMA journal_mode = WAL")
-    return c
+# ------------------------------------------------------------------ filas y conexión
+class Fila(dict):
+    """Fila que se lee por nombre (f["rut"]) o por posición (f[0]), como sqlite3.Row."""
+    __slots__ = ("_valores",)
+
+    def __getitem__(self, k):
+        if isinstance(k, int):
+            return self._valores[k]
+        return dict.__getitem__(self, k)
+
+
+def _fabrica_filas(cursor):
+    nombres = [d.name for d in cursor.description] if cursor.description else []
+
+    def hacer(valores):
+        f = Fila(zip(nombres, valores))
+        f._valores = valores
+        return f
+    return hacer
+
+
+def _sql(consulta: str) -> str:
+    # Marcadores al estilo SQLite (?) → psycopg (%s). Los % literales se escapan antes.
+    return consulta.replace("%", "%%").replace("?", "%s")
+
+
+def _parametros(params):
+    if params is None:
+        return None
+    return tuple(int(p) if isinstance(p, bool) else p for p in params)
+
+
+class Cursor:
+    def __init__(self, cur, lastrowid=None):
+        self._cur, self.lastrowid = cur, lastrowid
+
+    @property
+    def rowcount(self) -> int:
+        return self._cur.rowcount
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
+class Conexion:
+    """Envoltorio mínimo sobre psycopg con la interfaz que usa el portal (execute, executemany, lastrowid)."""
+
+    def __init__(self, conn: psycopg.Connection):
+        self._c = conn
+
+    def execute(self, consulta: str, params=None) -> Cursor:
+        cur = self._c.cursor(row_factory=_fabrica_filas)
+        q = consulta.strip().rstrip(";")
+        devolver_id = q[:6].upper() == "INSERT" and " RETURNING " not in q.upper()
+        if devolver_id:
+            q += " RETURNING *"
+        cur.execute(_sql(q), _parametros(params))
+        lastrowid = None
+        if devolver_id:
+            fila = cur.fetchone()
+            lastrowid = fila.get("id") if fila else None
+        return Cursor(cur, lastrowid)
+
+    def executemany(self, consulta: str, filas):
+        with self._c.cursor() as cur:
+            cur.executemany(_sql(consulta), [_parametros(f) for f in filas])
+
+    def script(self, sql: str):
+        """Ejecuta un archivo SQL completo (migraciones). Sin marcadores."""
+        self._c.execute(sql)
+
+    def commit(self):
+        self._c.commit()
+
+    def rollback(self):
+        self._c.rollback()
+
+
+_pool: ConnectionPool | None = None
+_lock_pool = threading.Lock()
+
+
+def _restablecer(conn: psycopg.Connection):
+    # Al devolver una conexión al pool: sin rol de módulo y de vuelta al esquema del portal.
+    conn.execute(f"RESET ROLE; SET search_path TO {ESQUEMA_PORTAL}")
+    conn.commit()
+
+
+def pool() -> ConnectionPool:
+    global _pool
+    with _lock_pool:
+        if _pool is None:
+            _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=20, open=True,
+                                   kwargs={"options": f"-c search_path={ESQUEMA_PORTAL} -c timezone=UTC", "connect_timeout": 10},
+                                   reset=_restablecer)
+            atexit.register(_pool.close)  # cierre ordenado al terminar (consola y servidor)
+        return _pool
 
 
 @contextmanager
-def bd():
-    c = conectar()
-    try:
-        yield c
+def bd(esquema: str | None = None, rol: str | None = None):
+    """Conexión del pool. Confirma al salir sin error; si hay excepción, revierte.
+    Con `esquema`/`rol` la conexión queda acotada a un módulo (ver plataforma.bd_modulo)."""
+    with pool().connection() as conn:
+        if rol:
+            conn.execute(f'SET ROLE "{rol}"')
+        if esquema:
+            conn.execute(f'SET search_path TO "{esquema}"')
+        c = Conexion(conn)
+        try:
+            yield c
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+# ------------------------------------------------------------------ migraciones numeradas
+def aplicar_migraciones(esquema: str, carpeta: Path, rol: str | None = None) -> list[str]:
+    """Aplica en orden las migraciones NNN_*.sql pendientes del esquema. Una migración ya aplicada no
+    se puede editar: si su contenido cambió, se detiene (los cambios van en una migración nueva)."""
+    archivos = sorted(p for p in Path(carpeta).glob("*.sql") if MIGRACION_VALIDA.fullmatch(p.name))
+    numeros = [int(p.name[:3]) for p in archivos]
+    if numeros != list(range(1, len(numeros) + 1)):
+        raise RuntimeError(f"migraciones de '{esquema}' mal numeradas: deben ser 001, 002, 003… sin saltos.")
+    aplicadas = []
+    with bd() as c:
+        c.execute(f'CREATE SCHEMA IF NOT EXISTS "{esquema}"' + (f' AUTHORIZATION "{rol}"' if rol else ""))
+    with bd(esquema=esquema, rol=rol) as c:
+        c.script("CREATE TABLE IF NOT EXISTS _migraciones (version INTEGER PRIMARY KEY, archivo TEXT NOT NULL, "
+                 "sha256 TEXT NOT NULL, aplicada_en TEXT NOT NULL)")
         c.commit()
-    finally:
-        c.close()
-
-
-# Columnas agregadas después de la primera versión (migración simple e idempotente)
-MIGRACIONES = {
-    "solicitudes_derechos": {
-        "acuse_en": "TEXT",
-        "prorrogada": "INTEGER NOT NULL DEFAULT 0",
-        "prorroga_motivo": "TEXT",
-        "respondida_en": "TEXT",
-        "respuesta_hash": "TEXT",
-    },
-}
+        # Candado por esquema: si dos procesos arrancan a la vez, solo uno migra.
+        c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (esquema,))
+        hechas = {f["version"]: f for f in c.execute("SELECT * FROM _migraciones")}
+        for p in archivos:
+            v, sql = int(p.name[:3]), p.read_text(encoding="utf-8")
+            huella = hashlib.sha256(sql.encode()).hexdigest()
+            if v in hechas:
+                if hechas[v]["sha256"] != huella:
+                    raise RuntimeError(f"la migración {p.name} de '{esquema}' cambió después de aplicarse; "
+                                       "no se editan migraciones aplicadas, se agrega una nueva.")
+                continue
+            c.script(sql)
+            c.execute("INSERT INTO _migraciones VALUES (?,?,?,?)", (v, p.name, huella, ahora()))
+            aplicadas.append(p.name)
+    return aplicadas
 
 
 def inicializar():
-    with bd() as c:
-        c.executescript(ESQUEMA)
-        for tabla, columnas in MIGRACIONES.items():
-            existentes = {r["name"] for r in c.execute(f"PRAGMA table_info({tabla})")}
-            for col, tipo in columnas.items():
-                if col not in existentes:
-                    c.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
+    aplicar_migraciones(ESQUEMA_PORTAL, MIGRACIONES_PORTAL)
 
 
 def leer_ajuste(clave: str, defecto=None):
@@ -227,7 +205,8 @@ def _hash_fila(anterior: str, ts: str, usuario_id, accion: str, detalle, ip) -> 
 
 
 def auditar(accion: str, usuario_id: int | None = None, detalle: str | None = None, ip: str | None = None):
-    with _lock_auditoria, bd() as c:
+    with bd() as c:
+        c.execute("SELECT pg_advisory_xact_lock(?)", (_ID_AUDITORIA,))
         fila = c.execute("SELECT hash FROM auditoria ORDER BY id DESC LIMIT 1").fetchone()
         nuevo_id = None
         if fila:
@@ -240,10 +219,13 @@ def auditar(accion: str, usuario_id: int | None = None, detalle: str | None = No
             nuevo_id = int(a.get("ultimo_id_archivado") or 0) + 1
         ts = ahora()
         h = _hash_fila(anterior, ts, usuario_id, accion, detalle, ip)
-        c.execute(
-            "INSERT INTO auditoria (id, ts, usuario_id, accion, detalle, ip, hash_anterior, hash) VALUES (?,?,?,?,?,?,?,?)",
-            (nuevo_id, ts, usuario_id, accion, detalle, ip, anterior, h),
-        )
+        if nuevo_id is None:
+            c.execute("INSERT INTO auditoria (ts, usuario_id, accion, detalle, ip, hash_anterior, hash) VALUES (?,?,?,?,?,?,?)",
+                      (ts, usuario_id, accion, detalle, ip, anterior, h))
+        else:
+            c.execute("INSERT INTO auditoria (id, ts, usuario_id, accion, detalle, ip, hash_anterior, hash) VALUES (?,?,?,?,?,?,?,?)",
+                      (nuevo_id, ts, usuario_id, accion, detalle, ip, anterior, h))
+            c.execute("SELECT setval(pg_get_serial_sequence('auditoria', 'id'), ?)", (nuevo_id,))
         _espejo_siem(ts, usuario_id, accion, detalle, ip, h)
 
 
@@ -255,7 +237,7 @@ def _espejo_siem(ts, usuario_id, accion, detalle, ip, h):
     try:
         LOG_SIEM.parent.mkdir(parents=True, exist_ok=True)
         with open(LOG_SIEM, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"ts": ts, "app": "fricke-store", "usuario_id": usuario_id, "accion": accion,
+            fh.write(json.dumps({"ts": ts, "app": f"{ESTABLECIMIENTO}-store", "usuario_id": usuario_id, "accion": accion,
                                  "detalle": detalle, "ip": ip, "hash": h}, ensure_ascii=False) + "\n")
     except OSError:
         pass  # el espejo nunca debe impedir registrar en la bitácora principal
@@ -284,7 +266,8 @@ def archivar_auditoria(dias: int, carpeta) -> dict:
     limite = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat(timespec="seconds")
     carpeta = Path(carpeta)
     carpeta.mkdir(parents=True, exist_ok=True)
-    with _lock_auditoria, bd() as c:
+    with bd() as c:
+        c.execute("SELECT pg_advisory_xact_lock(?)", (_ID_AUDITORIA,))
         filas = c.execute("SELECT * FROM auditoria WHERE ts < ? ORDER BY id", (limite,)).fetchall()
         if not filas:
             return {"archivados": 0}
@@ -294,9 +277,11 @@ def archivar_auditoria(dias: int, carpeta) -> dict:
                 fh.write(json.dumps(dict(f), ensure_ascii=False) + "\n")
         sello = hashlib.sha256(archivo.read_bytes()).hexdigest()
         c.execute("DELETE FROM auditoria WHERE id <= ?", (filas[-1]["id"],))
-        c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('ancla_auditoria', ?, ?)",
+        c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES ('ancla_auditoria', ?, ?) "
+                  "ON CONFLICT (clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
                   (filas[-1]["hash"], ahora()))
-        c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('ultimo_id_archivado', ?, ?)",
+        c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES ('ultimo_id_archivado', ?, ?) "
+                  "ON CONFLICT (clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
                   (str(filas[-1]["id"]), ahora()))
     auditar("bitacora_archivada", None, f"{len(filas)} registros en {archivo.name} sha256 {sello}")
     return {"archivados": len(filas), "archivo": str(archivo), "sha256": sello}

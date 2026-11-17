@@ -1,0 +1,17 @@
+{
+  "clave": "marga_marga",
+  "producto": "Marga-Marga Store",
+  "institucion": "Hospital Marga-Marga",
+  "comuna": "Villa Alemana",
+  "unidad_desarrolladora": "Unidad de Innovación y Desarrollo",
+  "unidad_desarrolladora_detalle": "Hospital Marga-Marga (completar)",
+  "jefe_servicio": "Director(a) del Hospital Marga-Marga",
+  "correo_dpd": "protecciondedatos@hospital.cl",
+  "mesa_ayuda": "Anexo 0000 · Mesa de ayuda TI",
+  "dominio_correo": "",
+  "palabras_contrasena": ["marga", "margamarga", "villaalemana", "quilpue"],
+  "colores": {
+    "claro": {"--primario": "#2e5aa8", "--acento": "#d9822b", "--acento-texto": "#a85d12", "--primario-suave": "#dbe5f6", "--acento-suave": "#fbeedf"},
+    "oscuro": {"--primario": "#9bb8ee", "--acento": "#f0a75e", "--acento-texto": "#f0a75e", "--primario-suave": "#1f3a6b", "--acento-suave": "#4a2f12"}
+  }
+}

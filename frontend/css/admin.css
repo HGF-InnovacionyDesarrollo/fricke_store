@@ -8,6 +8,18 @@
 .menu .contador:empty { display: none; }
 .buscador { max-width: 480px; margin-bottom: 16px; }
 .buscador label { background: var(--fondo); }
+.fila-mfa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; }
+.fila-mfa small { color: var(--texto-3); }
+.mod-logo { width: 32px; height: 32px; display: block; }
+.filtros-bitacora { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.filtros-bitacora .buscador { flex: 1 1 280px; margin-bottom: 0; }
+.filtros-bitacora .fecha { flex: 0 1 170px; margin-bottom: 0; }
+.filtros-bitacora .fecha input { padding-top: 18px; }
+.filtros-bitacora .fecha label { top: -8px; font-size: 12px; background: var(--fondo); }
+.filtros-bitacora .btn-texto { height: 56px; }
+.filtros-bitacora #exportar-bitacora { height: 56px; margin-left: auto; }
+.filtros-bitacora #exportar-bitacora svg { width: 20px; height: 20px; }
+.nota-bitacora { font-size: 12.5px; color: var(--texto-3); margin: 8px 0 12px; min-height: 1em; }
 
 .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .metrica { background: var(--superficie); border-radius: 16px; padding: 16px 18px; }

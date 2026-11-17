@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict, deque
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 import config as cfg
@@ -144,6 +144,8 @@ def _usuario_dict(u) -> dict:
         "cargo": u["cargo"], "unidad": u["unidad"], "rol": u["rol"], "activo": bool(u["activo"]),
         "debe_cambiar_clave": bool(u["debe_cambiar_clave"]), "bloqueado_hasta": u["bloqueado_hasta"],
         "creado_en": u["creado_en"], "clave_cambiada_en": u["clave_cambiada_en"],
+        "mfa_activo": bool(u["mfa_activo"]), "mfa_exigido": bool(u["mfa_exigido"]),
+        "mfa_por_perfil": u["rol"] in cfg.MFA_PERFILES,
     }
 
 
@@ -160,9 +162,9 @@ def resumen(ctx: Contexto = Depends(auditoria_o_gestion)):
             "solicitudes_cuenta": n("SELECT COUNT(*) FROM solicitudes_cuenta WHERE estado='pendiente'"),
             "solicitudes_clave": n("SELECT COUNT(*) FROM solicitudes_clave WHERE estado='pendiente'"),
             "derechos_pendientes": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision')"),
-            "derechos_vencidos": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence < date('now')"),
+            "derechos_vencidos": n("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence < to_char(CURRENT_DATE, 'YYYY-MM-DD')"),
             "modulos": n("SELECT COUNT(*) FROM modulos"),
-            "fallidos_24h": n("SELECT COUNT(*) FROM auditoria WHERE accion='login_fallido' AND ts > datetime('now','-1 day')"),
+            "fallidos_24h": n("SELECT COUNT(*) FROM auditoria WHERE accion='login_fallido' AND ts::timestamptz > now() - interval '1 day'"),
             "incidentes_abiertos": n("SELECT COUNT(*) FROM incidentes WHERE estado<>'cerrado'"),
             "alertas": alertas_seguridad(c),
             "respaldo": estado_respaldo(),
@@ -177,8 +179,8 @@ def listar_usuarios(q: str = "", ctx: Contexto = Depends(solo_admin)):
     rut_q = re.sub(r"[^0-9kK]", "", q)
     with bd() as c:
         filas = c.execute(
-            """SELECT * FROM usuarios WHERE nombre LIKE ? OR unidad LIKE ? OR cargo LIKE ?
-               OR (? <> '' AND replace(rut,'-','') LIKE ?) ORDER BY activo DESC, nombre LIMIT 300""",
+            """SELECT * FROM usuarios WHERE nombre ILIKE ? OR unidad ILIKE ? OR cargo ILIKE ?
+               OR (? <> '' AND replace(rut,'-','') ILIKE ?) ORDER BY activo DESC, nombre LIMIT 300""",
             (patron, patron, patron, rut_q, f"%{rut_q}%"),
         ).fetchall()
         sesiones = {r[0] for r in c.execute("SELECT DISTINCT usuario_id FROM sesiones")}
@@ -228,6 +230,7 @@ class CambiosUsuario(BaseModel):
     unidad: str | None = Field(default=None, max_length=80)
     rol: str | None = None
     activo: bool | None = None
+    mfa_exigido: bool | None = None
 
 
 @router.patch("/api/admin/usuarios/{uid}")
@@ -246,6 +249,8 @@ def editar_usuario(uid: int, d: CambiosUsuario, ctx: Contexto = Depends(solo_adm
         raise HTTPException(400, "El nombre no puede quedar vacío.")
     if "activo" in cambios:
         cambios["activo"] = int(cambios["activo"])
+    if "mfa_exigido" in cambios:
+        cambios["mfa_exigido"] = int(cambios["mfa_exigido"])
     if not cambios:
         return {"ok": True}
     with bd() as c:
@@ -255,7 +260,26 @@ def editar_usuario(uid: int, d: CambiosUsuario, ctx: Contexto = Depends(solo_adm
         c.execute(f"UPDATE usuarios SET {sets} WHERE id=?", (*cambios.values(), uid))
         if cambios.get("activo") == 0 or "rol" in cambios:
             c.execute("DELETE FROM sesiones WHERE usuario_id=?", (uid,))
-    auditar("usuario_editado", uid, f"{', '.join(cambios)} por usuario #{ctx.u['id']}", ctx.ip)
+    if "mfa_exigido" in cambios:
+        auditar("mfa_exigido" if cambios["mfa_exigido"] else "mfa_no_exigido", uid, f"por usuario #{ctx.u['id']}", ctx.ip)
+    otros = [k for k in cambios if k != "mfa_exigido"]
+    if otros:
+        auditar("usuario_editado", uid, f"{', '.join(otros)} por usuario #{ctx.u['id']}", ctx.ip)
+    return {"ok": True}
+
+
+@router.post("/api/admin/usuarios/{uid}/mfa-restablecer")
+def restablecer_mfa(uid: int, ctx: Contexto = Depends(solo_admin)):
+    """Para quien perdió o cambió el celular: borra su configuración; al ingresar la vuelve a crear
+    (si le es obligatoria). Verificar identidad antes, igual que con la contraseña."""
+    with bd() as c:
+        n = c.execute("UPDATE usuarios SET mfa_secreto=NULL, mfa_activo=0, mfa_activado_en=NULL, mfa_ultimo_paso=NULL "
+                      "WHERE id=?", (uid,)).rowcount
+        if not n:
+            raise HTTPException(404, "No existe la cuenta.")
+        c.execute("DELETE FROM mfa_respaldo WHERE usuario_id=?", (uid,))
+        c.execute("DELETE FROM sesiones WHERE usuario_id=?", (uid,))
+    auditar("mfa_restablecido", uid, f"por usuario #{ctx.u['id']}", ctx.ip)
     return {"ok": True}
 
 
@@ -429,7 +453,7 @@ class Modulo(BaseModel):
     orden: int = 100
     activo: bool = True
     finalidad: str = Field(max_length=500)
-    categorias_datos: str = Field(max_length=500)
+    categorias_datos: str = Field(max_length=1000)
     datos_sensibles: bool = False
     eipd_aprobada: bool = False
     responsable: str = Field(default="", max_length=120)
@@ -472,14 +496,28 @@ def _guardar_modulo(m: Modulo, ctx: Contexto, mid: int | None):
             cols = ", ".join(campos)
             mid = c.execute(f"INSERT INTO modulos ({cols}) VALUES ({', '.join('?' * len(campos))})", tuple(campos.values())).lastrowid
         else:
-            previo = c.execute("SELECT eipd_aprobada FROM modulos WHERE id=?", (mid,)).fetchone()
+            previo = c.execute("SELECT eipd_aprobada, origen, clave FROM modulos WHERE id=?", (mid,)).fetchone()
             if not previo:
                 raise HTTPException(404, "No existe el módulo.")
+            if previo["origen"] == "codigo":
+                # La ficha y la identidad de un módulo con código las define su manifiesto (revisado en el
+                # repositorio). Desde el panel solo se decide quién lo ve, si está activo, el orden y la EIPD.
+                from plataforma import CAMPOS_DE_CODIGO
+                for k in (*CAMPOS_DE_CODIGO, "clave"):
+                    campos.pop(k, None)
+                m.clave = previo["clave"]
             c.execute(f"UPDATE modulos SET {', '.join(f'{k}=?' for k in campos)} WHERE id=?", (*campos.values(), mid))
         c.execute("DELETE FROM modulos_rol WHERE modulo_id=?", (mid,))
         c.executemany("INSERT INTO modulos_rol VALUES (?,?)", [(mid, r) for r in set(m.roles)])
     auditar("modulo_guardado", ctx.u["id"], f"{m.clave} (EIPD {'aprobada' if m.eipd_aprobada else 'pendiente'})", ctx.ip)
     return {"id": mid}
+
+
+@router.get("/api/admin/modulos/registro-tratamiento")
+def registro_tratamiento(ctx: Contexto = Depends(auditoria_o_gestion)):
+    """Fichas de tratamiento completas de los módulos con código (base del Registro de Actividades de Tratamiento)."""
+    from plataforma import fichas
+    return fichas()
 
 
 @router.post("/api/admin/modulos")
@@ -494,19 +532,76 @@ def editar_modulo(mid: int, m: Modulo, ctx: Contexto = Depends(admin_o_dpd)):
 
 # ------------------------------------------------------------------ bitácora
 @router.get("/api/admin/auditoria")
-def ver_auditoria(q: str = "", accion: str = "", limite: int = 200, ctx: Contexto = Depends(auditoria_o_gestion)):
-    limite = max(1, min(limite, 1000))
+def ver_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "", limite: int = 200,
+                  ctx: Contexto = Depends(auditoria_o_gestion)):
+    """Bitácora con filtros. `desde` y `hasta` son fechas AAAA-MM-DD en hora de Chile, ambas incluidas."""
+    filas = _consultar_auditoria(q, accion, desde, hasta, max(1, min(limite, 1000)))
+    auditar("auditoria_consultada", ctx.u["id"], _texto_filtro(q, accion, desde, hasta), ctx.ip)
+    return [_fila_bitacora(f) for f in filas]
+
+
+MAX_EXPORTAR = 50_000
+
+
+@router.get("/api/admin/auditoria/exportar")
+def exportar_auditoria(q: str = "", accion: str = "", desde: str = "", hasta: str = "",
+                       ctx: Contexto = Depends(auditoria_o_gestion)):
+    """Descarga en CSV (se abre en Excel) de lo filtrado. Incluye RUT e IP: la descarga queda en la bitácora."""
+    import csv
+    import io
+    from zoneinfo import ZoneInfo
+    filas = _consultar_auditoria(q, accion, desde, hasta, MAX_EXPORTAR)
+    chile = ZoneInfo("America/Santiago")
+
+    def celda(v):
+        v = "" if v is None else str(v)
+        return "'" + v if v[:1] in ("=", "+", "-", "@", "\t", "\r") else v  # evita fórmulas al abrir en Excel
+
+    salida = io.StringIO()
+    w = csv.writer(salida, delimiter=";", lineterminator="\r\n")  # ; es el separador de Excel en Chile
+    w.writerow(["N°", "Fecha (hora de Chile)", "Evento", "Código", "Persona", "RUT", "Detalle", "IP", "Hash"])
+    for f in filas:
+        d = _fila_bitacora(f)
+        fecha = datetime.fromisoformat(f["ts"]).astimezone(chile).strftime("%d-%m-%Y %H:%M:%S")
+        w.writerow([f["id"], fecha, *(celda(x) for x in (d["etiqueta"], f["accion"], f["nombre"], d["rut"], f["detalle"], f["ip"], f["hash"]))])
+    filtro = _texto_filtro(q, accion, desde, hasta)
+    auditar("auditoria_exportada", ctx.u["id"], f"{len(filas)} registros · {filtro}"[:200], ctx.ip)
+    nombre = f"bitacora_{cfg.ESTABLECIMIENTO}_{desde or 'inicio'}_{hasta or date.today().isoformat()}.csv"
+    # El BOM inicial hace que Excel reconozca las tildes.
+    return Response("\ufeff" + salida.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+def _texto_filtro(q, accion, desde, hasta) -> str:
+    t = " · ".join(x for x in (q, accion, f"desde {desde}" if desde else "", f"hasta {hasta}" if hasta else "") if x)
+    return (t or "sin filtro")[:120]
+
+
+def _fila_bitacora(f) -> dict:
+    return {**dict(f), "rut": formatear_rut(f["rut"]) if f["rut"] else None,
+            "etiqueta": ETIQUETAS_ACCION.get(f["accion"], f["accion"].replace("_", " ").capitalize())}
+
+
+def _consultar_auditoria(q: str, accion: str, desde: str, hasta: str, limite: int):
+    for f in (desde, hasta):
+        try:
+            if f:
+                date.fromisoformat(f)
+        except ValueError:
+            raise HTTPException(400, "Fecha no válida.")
+    if desde and hasta and desde > hasta:
+        raise HTTPException(400, "La fecha «desde» no puede ser posterior a «hasta».")
     with bd() as c:
         filas = c.execute(
-            """SELECT a.id, a.ts, a.accion, a.detalle, a.ip, u.nombre, u.rut FROM auditoria a
+            """SELECT a.id, a.ts, a.accion, a.detalle, a.ip, a.hash, u.nombre, u.rut FROM auditoria a
                LEFT JOIN usuarios u ON u.id=a.usuario_id
-               WHERE (?='' OR a.accion=?) AND (?='' OR u.nombre LIKE ? OR a.detalle LIKE ? OR a.ip LIKE ?)
+               WHERE (?='' OR a.accion=?) AND (?='' OR u.nombre ILIKE ? OR a.detalle ILIKE ? OR a.ip ILIKE ?)
+                 AND (?='' OR (a.ts::timestamptz AT TIME ZONE 'America/Santiago')::date >= ?::date)
+                 AND (?='' OR (a.ts::timestamptz AT TIME ZONE 'America/Santiago')::date <= ?::date)
                ORDER BY a.id DESC LIMIT ?""",
-            (accion, accion, q, f"%{q}%", f"%{q}%", f"%{q}%", limite),
+            (accion, accion, q, f"%{q}%", f"%{q}%", f"%{q}%", desde, desde or None, hasta, hasta or None, limite),
         ).fetchall()
-    auditar("auditoria_consultada", ctx.u["id"], (q or accion or "sin filtro")[:80], ctx.ip)
-    return [{**dict(f), "rut": formatear_rut(f["rut"]) if f["rut"] else None,
-             "etiqueta": ETIQUETAS_ACCION.get(f["accion"], f["accion"].replace("_", " ").capitalize())} for f in filas]
+    return filas
 
 
 @router.get("/api/admin/auditoria/integridad")
@@ -551,10 +646,10 @@ def alertas_seguridad(c) -> list[dict]:
         al.append({"nivel": "media", "texto": f"Intentos fallidos desde {ips} direcciones distintas en la última hora."})
     madrugada = c.execute("""SELECT COUNT(*) FROM auditoria a JOIN usuarios u ON u.id=a.usuario_id
                              WHERE a.accion='login' AND u.rol IN ('admin','dpd','seguridad') AND a.ts > ?
-                             AND (CAST(strftime('%H', a.ts) AS INTEGER) + 21) % 24 < 6""", (hace(hours=24),)).fetchone()[0]
+                             AND EXTRACT(HOUR FROM a.ts::timestamptz AT TIME ZONE 'America/Santiago') < 6""", (hace(hours=24),)).fetchone()[0]
     if madrugada:
-        al.append({"nivel": "baja", "texto": f"{madrugada} ingreso(s) de cuentas privilegiadas de madrugada (00:00-06:00, hora de Chile aprox.) en las últimas 24 h."})
-    vencen = c.execute("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence <= date('now','+5 day')").fetchone()[0]
+        al.append({"nivel": "baja", "texto": f"{madrugada} ingreso(s) de cuentas privilegiadas de madrugada (00:00-06:00, hora de Chile) en las últimas 24 h."})
+    vencen = c.execute("SELECT COUNT(*) FROM solicitudes_derechos WHERE estado IN ('recibida','en_revision') AND vence <= to_char(CURRENT_DATE + 5, 'YYYY-MM-DD')").fetchone()[0]
     if vencen:
         al.append({"nivel": "media", "texto": f"{vencen} solicitud(es) de derechos vencen en 5 días o menos."})
     for inc in c.execute("SELECT * FROM incidentes WHERE estado<>'cerrado'").fetchall():
@@ -719,7 +814,8 @@ def contencion(accion: str, d: Confirmacion, ctx: Contexto = Depends(seguridad_o
         elif accion == "suspender-modulos":
             activos = [r[0] for r in c.execute("SELECT id FROM modulos WHERE activo=1")]
             c.execute("UPDATE modulos SET activo=0")
-            c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('modulos_suspendidos', ?, ?)",
+            c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES ('modulos_suspendidos', ?, ?) "
+                      "ON CONFLICT (clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
                       (",".join(map(str, activos)), ahora()))
             res["modulos"] = len(activos)
         elif accion == "reanudar-modulos":
@@ -728,7 +824,8 @@ def contencion(accion: str, d: Confirmacion, ctx: Contexto = Depends(seguridad_o
             c.execute("DELETE FROM ajustes WHERE clave='modulos_suspendidos'")
             res["modulos"] = len(ids)
         else:
-            c.execute("INSERT OR REPLACE INTO ajustes (clave, valor, actualizado) VALUES ('formularios_pausados', ?, ?)",
+            c.execute("INSERT INTO ajustes (clave, valor, actualizado) VALUES ('formularios_pausados', ?, ?) "
+                      "ON CONFLICT (clave) DO UPDATE SET valor=excluded.valor, actualizado=excluded.actualizado",
                       ("1" if accion == "pausar-formularios" else "0", ahora()))
     auditar("contencion_" + accion.replace("-", "_"), ctx.u["id"], d.motivo.strip()[:300], ctx.ip)
     return {"ok": True, **res}

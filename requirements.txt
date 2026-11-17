@@ -1,3 +1,9 @@
 fastapi>=0.110
 uvicorn>=0.29
 cryptography>=42
+psycopg[binary]>=3.2
+psycopg_pool>=3.2
+qrcode>=7.4
+# Solo para generar íconos de módulo (backend/logo_modulo.py)
+fonttools>=4.50
+brotli>=1.1

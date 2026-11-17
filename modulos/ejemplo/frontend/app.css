@@ -1,0 +1,11 @@
+/* Estilos del módulo de ejemplo. Solo variables de base.css; el color de la familia va solo en el ícono. */
+.lista-avisos { display: grid; gap: 12px; max-width: 760px; }
+.aviso h2 { font-size: 16px; line-height: 24px; font-weight: 500; margin: 0 0 4px; }
+.aviso p { margin: 0 0 12px; color: var(--texto-2); white-space: pre-wrap; font-size: 14px; line-height: 20px; }
+.aviso .pie-aviso { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; color: var(--texto-3); }
+.aviso .pie-aviso .avatar { width: 24px; height: 24px; font-size: 12px; }
+.autor { display: inline-flex; align-items: center; gap: 8px; }
+.ficha { max-width: 640px; }
+.ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; font-size: 14px; line-height: 20px; }
+.ficha dt { color: var(--texto-3); }
+.ficha dd { margin: 0; }

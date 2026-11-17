@@ -35,13 +35,13 @@ class Redireccion(BaseHTTPRequestHandler):
 def main():
     if cfg.TLS_CERT and cfg.TLS_KEY:
         threading.Thread(target=HTTPServer((HOST, PUERTO_HTTP), Redireccion).serve_forever, daemon=True).start()
-        print(f"Fricke Store en https://{HOST}:{PUERTO_HTTPS} (HTTP {PUERTO_HTTP} redirige a HTTPS)")
+        print(f"{cfg.NOMBRE_PRODUCTO} en https://{HOST}:{PUERTO_HTTPS} (HTTP {PUERTO_HTTP} redirige a HTTPS)")
         uvicorn.run("app:app", app_dir=os.path.dirname(__file__), host=HOST, port=PUERTO_HTTPS,
                     ssl_certfile=cfg.TLS_CERT, ssl_keyfile=cfg.TLS_KEY,
                     ssl_ciphers="ECDHE+AESGCM:ECDHE+CHACHA20", ssl_version=ssl.PROTOCOL_TLS_SERVER,
                     proxy_headers=True)
     else:
-        print(f"Fricke Store en http://{HOST}:{PUERTO_HTTP} — SIN HTTPS: solo para desarrollo. "
+        print(f"{cfg.NOMBRE_PRODUCTO} en http://{HOST}:{PUERTO_HTTP} — SIN HTTPS: solo para desarrollo. "
               "Configura ECO_TLS_CERT y ECO_TLS_KEY para producción.")
         uvicorn.run("app:app", app_dir=os.path.dirname(__file__), host=HOST, port=PUERTO_HTTP, proxy_headers=True)
 

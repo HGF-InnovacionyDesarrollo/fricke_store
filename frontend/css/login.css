@@ -50,3 +50,13 @@ body.login { display: flex; flex-direction: column; align-items: center; justify
 .dlg-grid .ancho { grid-column: 1 / -1; }
 @media (max-width: 520px) { .dlg-grid { grid-template-columns: 1fr; } }
 .dlg-texto { margin: 0 0 20px; color: var(--texto-2); }
+
+/* segundo factor */
+.pasos-mfa { margin: 0 0 12px; padding-left: 20px; color: var(--texto-2); font-size: 14px; line-height: 1.5; }
+.pasos-mfa li + li { margin-top: 6px; }
+.qr-mfa { width: 184px; height: 184px; margin: 4px 0 12px 20px; background: #fff; border-radius: 12px; padding: 6px; border: 1px solid var(--borde); }
+.qr-mfa svg { width: 100%; height: 100%; }
+.secreto-mfa { margin: 0 0 16px 20px; font-size: 13px; color: var(--texto-2); }
+.secreto-mfa summary { cursor: pointer; color: var(--primario); }
+.secreto-mfa code, .codigos-respaldo code { font: 500 14px/1.4 ui-monospace, Consolas, monospace; letter-spacing: .04em; }
+.codigos-respaldo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--superficie); border-radius: 12px; padding: 14px 18px; }
