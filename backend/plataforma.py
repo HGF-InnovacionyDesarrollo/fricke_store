@@ -121,6 +121,10 @@ def _validar(m: Manifiesto, carpeta: Path) -> list[str]:
     else:
         errores += [f"logo: {e}" for e in verificar_logo(m.archivo_logo, m.familia) if not e.startswith("faltan archivos")]
     errores += [f"nombre: {e}" for e in problemas_nombre(m.nombre)]
+    # Primera etapa: Fricke Store no maneja datos de pacientes (decisión del 17 nov 2026, ECO_DATOS_PACIENTES)
+    texto_ficha = f"{m.tratamiento.titulares} {m.tratamiento.categorias_datos} {m.tratamiento.finalidad}".lower()
+    if not cfg.DATOS_PACIENTES and "paciente" in texto_ficha:
+        errores.append("en esta etapa los módulos no manejan datos de pacientes (la ficha los menciona).")
     t = m.tratamiento
     for nombre, valor, minimo in (("finalidad", t.finalidad, 10), ("categorias_datos", t.categorias_datos, 3),
                                   ("titulares", t.titulares, 3), ("base_licitud", t.base_licitud, 5),

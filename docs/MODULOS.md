@@ -123,6 +123,10 @@ MANIFIESTO = Manifiesto(
 
 ## 7. Ley 21.719 (protección de datos)
 
+> **Primera etapa: sin datos de pacientes.** Ningún módulo registra ni consulta datos de pacientes. El portal no carga
+> un módulo cuya ficha de tratamiento los mencione (`ECO_DATOS_PACIENTES=0`). Se habilitarán más adelante, con el
+> registro compartido de pacientes y la evaluación de impacto del DPD.
+
 Cada módulo que guarde datos de personas **debe**:
 
 1. **Ficha de tratamiento** completa en el manifiesto. Se consulta en `GET /api/admin/modulos/registro-tratamiento`

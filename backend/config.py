@@ -20,6 +20,8 @@ SQLITE_ANTERIOR = Path(os.environ.get("ECO_DB", BASE_DIR / "data" / "ecosistema.
 MODULOS_DIR = BASE_DIR / "modulos"
 # Cada módulo usa un rol de PostgreSQL propio, dueño solo de su esquema (requiere CREATEROLE)
 ROLES_POR_MODULO = os.environ.get("ECO_ROLES_POR_MODULO", "1") == "1"
+# Primera etapa: ningún módulo maneja datos de pacientes. Se habilita solo con EIPD aprobada por el DPD.
+DATOS_PACIENTES = os.environ.get("ECO_DATOS_PACIENTES", "0") == "1"
 
 # Identidad del establecimiento: viene de establecimientos/<clave>/establecimiento.json (ECO_ESTABLECIMIENTO).
 # Las variables ECO_* siguen pudiendo sobrescribir cada dato.
