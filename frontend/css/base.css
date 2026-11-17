@@ -58,6 +58,7 @@ a { color: var(--primario); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button { font: inherit; color: inherit; }
 svg { display: block; fill: currentColor; }
+svg.linea { fill: none; }   /* íconos de línea (Lucide): solo contorno */
 .oculto { display: none !important; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 :focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; }
