@@ -1,0 +1,21 @@
+# Datos de red WiFi (ya no se usan, pero no deben subirse nunca)
+secretos.h
+
+# Compilación y volcados
+build/
+*.bin
+*.elf
+
+# Registros sacados de la SD
+*.csv
+
+# Archivos temporales de Word
+~$*
+~WRL*.tmp
+
+# Configurador: salidas de PyInstaller
+configurador/build/
+configurador/dist/
+configurador/*.spec
+configurador/pyinst.log
+configurador/__pycache__/

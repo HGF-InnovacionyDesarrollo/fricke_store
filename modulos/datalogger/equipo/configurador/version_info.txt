@@ -1,0 +1,15 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=(2, 0, 0, 0), prodvers=(2, 0, 0, 0), mask=0x3f, flags=0x0,
+                    OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('0C0A04B0', [
+      StringStruct('CompanyName', 'Hospital Dr. Gustavo Fricke - Unidad de Innovacion y Desarrollo'),
+      StringStruct('FileDescription', 'Monitor T/H Hospital Dr. Gustavo Fricke'),
+      StringStruct('FileVersion', '2.0'),
+      StringStruct('InternalName', 'MonitorTH'),
+      StringStruct('OriginalFilename', 'Monitor TH Hospital Dr. Gustavo Fricke.exe'),
+      StringStruct('ProductName', 'Monitor T/H Hospital Dr. Gustavo Fricke'),
+      StringStruct('ProductVersion', '2.0')])]),
+    VarFileInfo([VarStruct('Translation', [0x0C0A, 1200])])
+  ]
+)

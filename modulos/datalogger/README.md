@@ -38,7 +38,7 @@ hora se toman como repetidas.
 
 ## Configurador de equipos (USB)
 
-Trae al portal el Configurador de Windows de `Monitor_TH/configurador` (mismo protocolo, firmware 2.0 o posterior):
+Trae al portal el Configurador de Windows de `equipo/configurador` (mismo protocolo, firmware 2.0 o posterior):
 
 - **Equipo**: estado (hora y diferencia con el PC, tarjeta SD, energía, sensores, WiFi), poner la hora del PC, abrir la
   red para emparejar (3 min) y reiniciar.
@@ -54,6 +54,18 @@ la bitácora (`datalogger_equipo_configurado`, sin la clave ni el contenido), y 
 del equipo si ya existe. **Instalar firmware sigue en el Configurador de Windows** (necesita esptool).
 
 El portal todavía no recibe los envíos por WiFi del firmware 2.1: falta la credencial de equipo (ver Pendiente).
+
+## Código del equipo (`equipo/`)
+
+El código del Monitor T/H vive dentro del módulo, en `equipo/`: firmware del ESP32-C6 (`Monitor_TH.ino` y sus `.h`),
+Configurador de Windows (`configurador/`), herramientas (`herramientas/`, por ejemplo `generar_logo.py` para la
+pantalla de presentación), documentos, caja imprimible (`caja/`) y respaldo del firmware 1.3 (`firmware/respaldo/`).
+Cómo compilar e instalar: `equipo/README.md` y `equipo/configurador/LEEME.md`. El portal no ejecuta nada de esta
+carpeta; la clave de firma y el WiFi de cada equipo se guardan en su memoria, nunca en el código (`secretos.h` no se
+sube).
+
+La pantalla del equipo sigue las directrices de Fricke Store: paleta oscura, fechas como "18 nov 2026" y, cada
+5 minutos por 5 segundos, la presentación con el ícono de F+data y "Funciona con" Fricke Store.
 
 ## Permisos
 
