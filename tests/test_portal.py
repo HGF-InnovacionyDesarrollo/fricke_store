@@ -47,7 +47,7 @@ def test_bitacora_de_modulo_rechaza_rut_y_acciones_no_declaradas():
 def test_modulo_con_datos_de_pacientes_no_se_carga():
     from pathlib import Path
     m = plataforma.Manifiesto(
-        clave="ejemplo", nombre="Tablón de avisos", descripcion="x", version="0.1.0", responsable="Unidad", familia=5,
+        clave="ejemplo", nombre="F+avisos", descripcion="x", version="0.1.0", responsable="Unidad", familia=5,
         tratamiento=plataforma.FichaTratamiento(finalidad="Registrar caídas de pacientes", categorias_datos="clínicos",
                                                 titulares="pacientes", base_licitud="salud", conservacion="15 años"))
     assert any("pacientes" in e for e in plataforma._validar(m, Path("modulos/ejemplo")))

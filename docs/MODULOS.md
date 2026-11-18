@@ -4,7 +4,7 @@ Todo módulo del ecosistema (SIMI, monitor de temperatura, equipos médicos, etc
 Existen para que cada módulo se vea y se comporte como parte del mismo portal, comparta el ingreso con RUT
 y cumpla la **Ley 21.719** desde el primer día, sin que cada equipo tenga que reinventarlo.
 
-La referencia viva es el módulo de ejemplo [`modulos/ejemplo/`](../modulos/ejemplo/) (Tablón de avisos).
+La referencia viva es el módulo de ejemplo [`modulos/ejemplo/`](../modulos/ejemplo/) (F+avisos).
 Las palabras **debe** y **no debe** son obligatorias; **conviene** es una recomendación.
 
 ---
@@ -12,7 +12,7 @@ Las palabras **debe** y **no debe** son obligatorias; **conviene** es una recome
 ## 1. Crear un módulo
 
 ```bash
-python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2 [--pictograma pill.svg]
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "F+farmacia" --familia 2 [--pictograma pill.svg]
 ```
 
 Copia el ejemplo a `modulos/farmacia/` con la clave ya reemplazada. Luego:
@@ -49,7 +49,7 @@ modulos/<clave>/
 
 ```python
 MANIFIESTO = Manifiesto(
-    clave="farmacia", nombre="Farmacia", descripcion="Una línea", version="0.1.0",
+    clave="farmacia", nombre="F+farmacia", descripcion="Una línea", version="0.1.0",
     responsable="Unidad de Farmacia", icono="documento", color="#1565c0", orden=100,
     perfiles_iniciales=("admin",),
     tratamiento=FichaTratamiento(
@@ -153,9 +153,11 @@ del módulo debe poder ejecutarlas a mano mientras no exista un hook automático
 > del módulo, la navegación, los componentes y la checklist de aprobación. Prevalecen sobre lo que diga esta sección.
 
 - **Ícono del módulo:** baldosa de su familia (1 a 5) con un pictograma de Lucide. Se genera con
-  `python backend/logo_modulo.py --nombre "<Nombre>" --familia N --pictograma <archivo de 24 × 24>`, que crea todos
+  `python backend/logo_modulo.py --nombre "F+<nombre>" --familia N --pictograma <archivo de 24 × 24>`, que crea todos
   los archivos de la entrega en `docs/logo/modulos/<nombre>/` y copia el SVG a `frontend/img/modulos/`. El manifiesto
   declara `familia=N`; el portal valida el ícono y el nombre al cargar el módulo. El logo de Fricke Store no se toca.
+- **Nombre del módulo:** siempre «F+» y su nombre corto, en una sola palabra y en minúsculas (`F+data`, `F+farmacia`).
+  El portal no carga un módulo con otro formato y la revisión automática lo rechaza.
 - La página carga `/static/css/base.css`, `/marca/tema.css`, `/static/css/cabecera.css`, `/static/css/modulo.css`,
   `/static/js/comun.js`, `/static/js/cabecera.js` y `/static/js/modulo.js`, con un `<main>` vacío
   (ver `modulos/ejemplo/frontend/`).

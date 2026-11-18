@@ -1,7 +1,7 @@
 """Íconos de módulo según docs/diseno/ (Parte 2: baldosa de la grilla de Fricke Store, 5 familias).
 
-  python backend/logo_modulo.py --nombre "Prevención de caídas" --familia 3 --pictograma footprints.svg
-  python backend/logo_modulo.py --verificar prevencion-de-caidas --familia 3
+  python backend/logo_modulo.py --nombre "F+caidas" --familia 3 --pictograma footprints.svg
+  python backend/logo_modulo.py --verificar f-caidas --familia 3
 
 El pictograma es un SVG de retícula 24 × 24 con trazo (por ejemplo, un ícono de Lucide, licencia ISC).
 Genera en docs/logo/modulos/<nombre>/ todos los archivos de la entrega y copia el SVG a
@@ -36,7 +36,6 @@ FAMILIAS = {
 TAMANOS_PNG = (48, 96, 192, 512)
 ARCHIVOS = ("{n}.svg", "{n}-48.png", "{n}-96.png", "{n}-192.png", "{n}-512.png", "{n}-app-180.png", "{n}-horizontal.svg")
 PALABRAS_PROHIBIDAS = ("fricke", "app", "sistema")
-CONECTORES = {"de", "del", "la", "las", "el", "los", "y", "e", "a", "en", "con", "para"}
 SVG_NS = "http://www.w3.org/2000/svg"
 
 
@@ -46,19 +45,20 @@ def slug(nombre: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
 
 
+NOMBRE_MODULO = re.compile(r"^F\+[a-z0-9áéíóúüñ]+$")
+
+
 def problemas_nombre(nombre: str) -> list[str]:
-    p = []
-    palabras = nombre.split()
-    if not palabras:
+    """Regla de la Unidad (18 nov 2026): todo módulo se llama «F+» seguido de su nombre corto, en una palabra y en
+    minúsculas (ej.: «F+data», «F+avisos»)."""
+    if not nombre.strip():
         return ["El nombre está vacío."]
-    if len([w for w in palabras if w.lower() not in CONECTORES]) > 2:
-        p.append("El nombre debe tener una o dos palabras (sin contar «de», «y», etc.).")
-    if any(w.lower().strip(".,") in PALABRAS_PROHIBIDAS for w in palabras):
-        p.append("El nombre no lleva «Fricke», «App» ni «Sistema».")
-    if not palabras[0][0].isupper() or palabras[0][1:] != palabras[0][1:].lower() \
-            or any(w[0].isupper() for w in palabras[1:] if not w.isupper()):
-        p.append("Mayúscula solo en la primera palabra (ej.: «Prevención de caídas»).")
-    return p
+    if not NOMBRE_MODULO.match(nombre):
+        return ["El nombre debe ser «F+» y el nombre corto del módulo, en una sola palabra y en minúsculas "
+                "(ej.: «F+data», «F+farmacia»)."]
+    if nombre[2:] in PALABRAS_PROHIBIDAS:
+        return ["El nombre corto no puede ser «fricke», «app» ni «sistema»."]
+    return []
 
 
 # ------------------------------------------------------------------ construcción
