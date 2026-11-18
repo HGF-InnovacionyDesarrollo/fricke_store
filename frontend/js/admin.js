@@ -469,7 +469,7 @@ document.addEventListener("click", (e) => {
       clase: "amplio",
       html: `<div class="dlg-grid">
           ${campo("em-nombre", "Nombre", m?.nombre || "", 'maxlength="60"')}
-          ${campo("em-clave", "Clave (sin espacios)", m?.clave || "", 'maxlength="40" pattern="[a-z0-9-]+"')}
+          ${campo("em-clave", "Clave (sin espacios)", m?.clave || "", 'maxlength="40" pattern="[a-z0-9_\\-]+"')}
           ${campo("em-url", "Dirección (URL)", m?.url || "", 'maxlength="300" ancho')}
           ${campo("em-desc", "Descripción corta", m?.descripcion || "", 'maxlength="200" ancho')}
           <div class="campo"><select id="em-icono">${ICONOS_MODULO.map((i) => `<option ${m?.icono === i ? "selected" : ""}>${i}</option>`).join("")}</select><label for="em-icono">Ícono</label></div>
