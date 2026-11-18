@@ -7,6 +7,7 @@
 .aviso-alarmas .linea { color: var(--peligro); flex: none; }
 .aviso-alarmas:hover { background: var(--hover); }
 .grupo-equipo { margin: 0 0 24px; }
+.cab-equipo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .grilla-sensores { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .sensor { display: flex; flex-direction: column; gap: 8px; text-align: left; font: inherit; color: var(--texto); cursor: pointer; min-height: 160px; }
 .sensor:hover { background: var(--hover); }
@@ -56,6 +57,9 @@
 .leyenda { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; line-height: 16px; color: var(--texto-2); margin-top: 8px; }
 .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
 .leyenda i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--primario); }
+.grafico .serie.en-vivo { stroke-dasharray: 4 3; }
+.grafico circle.serie.en-vivo { fill: var(--primario); }
+.leyenda .m-vivo { border-top: 2px dashed var(--primario); }
 .leyenda .m-banda { height: 10px; border: 0; background: var(--ok); opacity: .25; }
 .leyenda .m-alarma { border-top: 2px dashed var(--peligro); }
 .bloque-excursiones { max-width: 960px; margin: 24px 0 0; }

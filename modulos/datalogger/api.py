@@ -1,20 +1,23 @@
 """API de F+data, montada en /api/m/datalogger/. Todo endpoint usa Depends(acceso(...)).
 
-Los datos llegan al importar los CSV de la tarjeta SD de cada equipo (los Monitor T/H no tienen red). Cuando los
-equipos puedan enviar datos solos, se necesitará una credencial de equipo común del portal (ver README).
+Los datos oficiales llegan al importar los CSV de la tarjeta SD de cada equipo. Los equipos con firmware 2.1 y WiFi
+envían además, cada minuto, el último valor de cada sensor a /api/m/datalogger/equipo con su credencial de equipo
+(plataforma.acceso_equipo): son lecturas "en vivo" y se guardan aparte (lecturas_wifi).
 """
 from __future__ import annotations
 
 import csv
 import io
 import math
+import socket
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from plataforma import ContextoModulo, acceso, bd_modulo, nombres_de
+from plataforma import (ContextoEquipo, ContextoModulo, acceso, acceso_equipo, bd_modulo, crear_credencial_equipo,
+                        credenciales_equipo, nombres_de, revocar_credencial_equipo)
 
 from .lectura_csv import hora_chile_a_utc, leer_archivo, utc_a_hora_chile, verificar_cadena
 from .manifiesto import CLAVE
@@ -25,6 +28,7 @@ SIN_DATOS_MIN = 75          # igual que el firmware: los sensores reportan cada 
 BATERIA_BAJA = 20
 INTERVALO_MIN = 5           # una fila cada 5 min por sensor
 MAX_DIAS_SERIE = 92
+WIFI_SIN_ENVIO_MIN = 5      # el equipo envía cada minuto: sin envíos en 5 min se muestra "sin conexión"
 DELTA_H_R = 10_000.0        # ΔH/R = 83,144 kJ/mol ÷ 8,3144 J/(mol·K), valor estándar para la temperatura cinética media
 
 VER, IMPORTAR, REVISAR, CONFIGURAR, EQUIPOS = (f"{CLAVE}.{p}" for p in ("ver", "importar", "revisar", "configurar", "equipos"))
@@ -94,9 +98,13 @@ def resumen(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
         perfiles = _perfiles(c)
         filas = [dict(f) for f in c.execute("""
             SELECT s.id, s.nombre, s.ubicacion, s.perfil_id, s.equipo_id, e.codigo AS equipo,
-                   l.fecha, l.temperatura, l.humedad, l.bateria, l.hora_lectura
+                   e.wifi_ultimo_envio, e.wifi_rssi,
+                   l.fecha, l.temperatura, l.humedad, l.bateria, l.hora_lectura,
+                   w.fecha AS w_fecha, w.temperatura AS w_temperatura, w.humedad AS w_humedad,
+                   w.bateria AS w_bateria, w.recibido_en AS w_recibido
             FROM sensores s JOIN equipos e ON e.id = s.equipo_id
             LEFT JOIN LATERAL (SELECT * FROM lecturas WHERE sensor_id = s.id ORDER BY fecha DESC LIMIT 1) l ON TRUE
+            LEFT JOIN LATERAL (SELECT * FROM lecturas_wifi WHERE sensor_id = s.id ORDER BY fecha DESC LIMIT 1) w ON TRUE
             WHERE s.activo ORDER BY e.codigo, s.numero NULLS LAST, s.nombre""")]
         pendientes = c.execute("SELECT count(*) FROM excursiones e JOIN sensores s ON s.id = e.sensor_id "
                                "WHERE e.revisada_por IS NULL AND s.activo").fetchone()[0]
@@ -104,12 +112,26 @@ def resumen(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
     equipos: dict[str, dict] = {}
     for f in filas:
         p = perfiles.get(f["perfil_id"])
+        origen = "sd"
+        if f["w_fecha"] and (not f["fecha"] or f["w_fecha"] > f["fecha"]):
+            # Lo más nuevo llegó por WiFi: se muestra eso (la SD, cuando se importe, queda como registro oficial).
+            origen = "wifi"
+            f.update(fecha=f["w_fecha"], temperatura=f["w_temperatura"], humedad=f["w_humedad"],
+                     bateria=f["w_bateria"], hora_lectura=f["w_fecha"])
+            sin_datos = f["w_recibido"] - f["w_fecha"] > timedelta(minutes=SIN_DATOS_MIN)
+        else:
+            sin_datos = bool(f["fecha"] and f["hora_lectura"]
+                             and f["fecha"] - f["hora_lectura"] > timedelta(minutes=SIN_DATOS_MIN))
         t, h = _f(f["temperatura"]), _f(f["humedad"])
-        sin_datos = bool(f["fecha"] and f["hora_lectura"]
-                         and f["fecha"] - f["hora_lectura"] > timedelta(minutes=SIN_DATOS_MIN))
         estado_t, estado_h = _estado_valor(t, p, "t"), _estado_valor(h, p, "h")
-        equipos.setdefault(f["equipo"], {"codigo": f["equipo"], "sensores": []})["sensores"].append({
-            "id": f["id"], "nombre": f["nombre"], "ubicacion": f["ubicacion"],
+        equipo = equipos.setdefault(f["equipo"], {
+            "codigo": f["equipo"], "sensores": [],
+            "wifi": {"ultimo_envio": f["wifi_ultimo_envio"], "rssi": f["wifi_rssi"],
+                     "conectado": bool(f["wifi_ultimo_envio"] and datetime.now(timezone.utc) - f["wifi_ultimo_envio"]
+                                       < timedelta(minutes=WIFI_SIN_ENVIO_MIN))} if f["wifi_ultimo_envio"] else None,
+        })
+        equipo["sensores"].append({
+            "id": f["id"], "nombre": f["nombre"], "ubicacion": f["ubicacion"], "origen": origen,
             "perfil": p["nombre"] if p else None, "fecha": f["fecha"], "hora_lectura": f["hora_lectura"],
             "temperatura": t, "humedad": h, "bateria": f["bateria"],
             "estado_t": estado_t, "estado_h": estado_h, "estado": _peor(estado_t, estado_h),
@@ -143,6 +165,13 @@ def serie(sid: int, desde: str | None = None, hasta: str | None = None,
             "SELECT fecha, temperatura, humedad, bateria, hora_lectura FROM lecturas "
             "WHERE sensor_id=? AND fecha >= ? AND fecha < ? ORDER BY fecha", (sid, ini, fin))]
         excursiones = _excursiones(c, "sensor_id=? AND inicio < ? AND (fin IS NULL OR fin >= ?)", (sid, fin, ini))
+        # Lo recibido por WiFi después del último dato de la SD (no entra en las estadísticas: no es el registro oficial)
+        en_vivo = [dict(f) for f in c.execute(
+            "SELECT fecha, temperatura, humedad, bateria FROM lecturas_wifi WHERE sensor_id=? AND fecha >= ? AND fecha < ? "
+            "AND fecha > coalesce((SELECT max(fecha) FROM lecturas WHERE sensor_id=?), '-infinity') ORDER BY fecha",
+            (sid, ini, fin, sid))]
+    for f in en_vivo:
+        f["temperatura"], f["humedad"] = _f(f["temperatura"]), _f(f["humedad"])
     for f in lecturas:
         f["temperatura"], f["humedad"] = _f(f["temperatura"]), _f(f["humedad"])
     ts = [f["temperatura"] for f in lecturas if f["temperatura"] is not None]
@@ -162,7 +191,7 @@ def serie(sid: int, desde: str | None = None, hasta: str | None = None,
         "sensor": s, "perfil": p, "desde": ini, "hasta": fin, "lecturas": lecturas,
         "temperatura": {**_estadisticas(ts, kelvin=True), "en_rango": en_rango(ts, "t")},
         "humedad": {**_estadisticas(hs), "en_rango": en_rango(hs, "h")},
-        "cobertura": cobertura, "huecos": huecos[:200], "excursiones": excursiones,
+        "cobertura": cobertura, "huecos": huecos[:200], "excursiones": excursiones, "en_vivo": en_vivo,
     }
 
 
@@ -283,14 +312,18 @@ def sensores(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
         perfiles = _perfiles(c)
         equipos = [dict(e) for e in c.execute("""
             SELECT e.*, (SELECT max(l.fecha) FROM lecturas l JOIN sensores s ON s.id = l.sensor_id
-                         WHERE s.equipo_id = e.id) AS ultimo_dato
+                         WHERE s.equipo_id = e.id) AS ultimo_dato,
+                   (SELECT max(l.fecha) FROM lecturas_wifi l JOIN sensores s ON s.id = l.sensor_id
+                    WHERE s.equipo_id = e.id) AS ultimo_dato_wifi
             FROM equipos e ORDER BY codigo""")]
         lista = [dict(s) for s in c.execute("""
-            SELECT s.*, (SELECT max(fecha) FROM lecturas WHERE sensor_id = s.id) AS ultimo_dato
+            SELECT s.*, greatest((SELECT max(fecha) FROM lecturas WHERE sensor_id = s.id),
+                                 (SELECT max(fecha) FROM lecturas_wifi WHERE sensor_id = s.id)) AS ultimo_dato
             FROM sensores s ORDER BY s.numero NULLS LAST, s.nombre""")]
     for s in lista:
         s["perfil"] = perfiles.get(s["perfil_id"], {}).get("nombre")
     for e in equipos:
+        e["ultimo_dato"] = max(filter(None, [e["ultimo_dato"], e.pop("ultimo_dato_wifi")]), default=None)
         e["sensores"] = [s for s in lista if s["equipo_id"] == e["id"]]
     return {"equipos": equipos, "perfiles": list(perfiles.values())}
 
@@ -298,6 +331,9 @@ def sensores(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
 class CambioSensor(BaseModel):
     ubicacion: str = Field(default="", max_length=80)
     activo: bool = True
+    # Tipo de almacenamiento: 0 = no cambiar, null = quitar, otro número = id del tipo. Los equipos que envían solo por
+    # WiFi no lo informan (los archivos de la SD sí), así que se fija aquí para ver el estado y las alarmas.
+    perfil_id: int | None = 0
 
 
 @router.put("/sensores/{sid}")
@@ -305,6 +341,10 @@ def actualizar_sensor(sid: int, d: CambioSensor, ctx: ContextoModulo = Depends(a
     with bd_modulo(CLAVE) as c:
         _sensor(c, sid)
         c.execute("UPDATE sensores SET ubicacion=?, activo=(?::int = 1) WHERE id=?", (d.ubicacion.strip(), d.activo, sid))
+        if d.perfil_id != 0:
+            if d.perfil_id is not None and d.perfil_id not in _perfiles(c):
+                raise HTTPException(422, "Ese tipo de almacenamiento no existe.")
+            c.execute("UPDATE sensores SET perfil_id=? WHERE id=?", (d.perfil_id, sid))
     ctx.auditar(f"{CLAVE}_sensor_actualizado", f"sensor #{sid}{'' if d.activo else ' (fuera de servicio)'}")
     return {"ok": True}
 
@@ -344,6 +384,119 @@ def registrar_accion_usb(d: AccionUSB, ctx: ContextoModulo = Depends(acceso(CLAV
                       "WHERE codigo=?", (d.serie.upper(), d.firmware, codigo))
     ctx.auditar(f"{CLAVE}_equipo_configurado", f"equipo {codigo}: {ACCIONES_USB[d.accion]}")
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ envío por WiFi (firmware 2.1)
+class NuevaCredencial(BaseModel):
+    equipo: str = Field(pattern=r"^[A-Za-z0-9_-]{2,16}$")
+
+
+def _ips_locales() -> list[str]:
+    """Direcciones IPv4 de este servidor en la red local, para armar la dirección que se pone en el equipo."""
+    ips = set()
+    try:
+        ips.update(socket.gethostbyname_ex(socket.gethostname())[2])
+    except OSError:
+        pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))  # no envía nada: solo elige la interfaz de salida
+            ips.add(s.getsockname()[0])
+    except OSError:
+        pass
+    return sorted(ip for ip in ips if not ip.startswith("127."))
+
+
+@router.get("/envio-wifi")
+def envio_wifi(request: Request, ctx: ContextoModulo = Depends(acceso(CLAVE, EQUIPOS))):
+    """Equipos habilitados para enviar por WiFi, con su último envío, y cómo armar la dirección."""
+    creds = credenciales_equipo(CLAVE)
+    with bd_modulo(CLAVE) as c:
+        estado = {f["codigo"]: dict(f) for f in c.execute(
+            "SELECT codigo, wifi_ultimo_envio, wifi_rssi, wifi_envios_ok, wifi_envios_falla FROM equipos")}
+    nombres = nombres_de({f["creada_por"] for f in creds})
+    for f in creds:
+        f["creada_por"] = nombres.get(f["creada_por"], "—")
+        f.update({k: v for k, v in estado.get(f["equipo"], {}).items() if k != "codigo"})
+    return {"equipos": creds, "ruta": f"/api/m/{CLAVE}/equipo", "ips": _ips_locales(),
+            "puerto": request.url.port or (443 if request.url.scheme == "https" else 80), "esquema": request.url.scheme}
+
+
+@router.post("/envio-wifi")
+def habilitar_envio_wifi(d: NuevaCredencial, ctx: ContextoModulo = Depends(acceso(CLAVE, EQUIPOS))):
+    """Crea la credencial del equipo (la anterior queda anulada). El secreto se entrega solo esta vez."""
+    secreto = crear_credencial_equipo(CLAVE, d.equipo, ctx.usuario_id)
+    ctx.auditar(f"{CLAVE}_envio_wifi_habilitado", f"equipo {d.equipo}")
+    return {"equipo": d.equipo, "secreto": secreto, "ruta": f"/api/m/{CLAVE}/equipo"}
+
+
+@router.delete("/envio-wifi/{cid}")
+def anular_envio_wifi(cid: int, ctx: ContextoModulo = Depends(acceso(CLAVE, EQUIPOS))):
+    if not revocar_credencial_equipo(CLAVE, cid):
+        raise HTTPException(404, "No existe esa credencial o ya estaba anulada.")
+    ctx.auditar(f"{CLAVE}_envio_wifi_anulado", f"credencial #{cid}")
+    return {"ok": True}
+
+
+class LecturaWifi(BaseModel):
+    n: int = Field(ge=1, le=99)
+    ieee: str = Field(pattern=r"^[0-9A-Fa-f]{16}$")
+    nombre: str = Field(default="", max_length=40)
+    temp: float | None = Field(default=None, ge=-80, le=100)
+    hum: float | None = Field(default=None, ge=0, le=100)
+    edad_s: int = Field(default=0, ge=0)
+    bat: int | None = Field(default=None, ge=-1, le=100)
+
+
+class EnvioWifi(BaseModel):
+    monitor: str = Field(pattern=r"^[A-Za-z0-9_-]{2,16}$")
+    serie: str = Field(default="", pattern=r"^([0-9A-Fa-f]{8,32})?$")
+    firmware: str = Field(default="", max_length=16, pattern=r"^[0-9A-Za-z._-]*$")
+    unix: int = Field(default=0, ge=0)
+    rssi: int | None = Field(default=None, ge=-120, le=0)
+    envios_ok: int | None = Field(default=None, ge=0)
+    envios_falla: int | None = Field(default=None, ge=0)
+    sensores: list[LecturaWifi] = Field(default_factory=list, max_length=32)
+
+
+@router.post("/equipo")
+def recibir_envio_wifi(d: EnvioWifi, eq: ContextoEquipo = Depends(acceso_equipo(CLAVE))):
+    """Lo que manda un Monitor T/H cada minuto. Guarda el último valor de cada sensor (sin repetir) y el estado
+    del equipo. No va a la bitácora: no lo hace una persona (la credencial registra su último uso e IP)."""
+    if d.monitor != eq.equipo:
+        raise HTTPException(403, "Esta credencial es de otro equipo.")
+    ahora_utc = datetime.now(timezone.utc)
+    base = datetime.fromtimestamp(d.unix, timezone.utc) if d.unix else None
+    if base is None or abs(base - ahora_utc) > timedelta(hours=12):
+        base = ahora_utc  # el equipo no tiene hora (o está muy desfasada): se usa la del servidor
+    nuevas = 0
+    with bd_modulo(CLAVE) as c:
+        eid = _equipo_id(c, d.monitor)
+        c.execute("UPDATE equipos SET serie=COALESCE(NULLIF(?, ''), serie), firmware=COALESCE(NULLIF(?, ''), firmware), "
+                  "wifi_ultimo_envio=?, wifi_rssi=?, wifi_envios_ok=?, wifi_envios_falla=? WHERE id=?",
+                  (d.serie.upper(), d.firmware, ahora_utc, d.rssi, d.envios_ok, d.envios_falla, eid))
+        for s in d.sensores:
+            ieee = s.ieee.upper()
+            fila = c.execute("SELECT id, equipo_id FROM sensores WHERE ieee=?", (ieee,)).fetchone()
+            if fila:
+                sid = fila["id"]
+                if fila["equipo_id"] != eid:
+                    c.execute("UPDATE sensores SET equipo_id=?, numero=? WHERE id=?", (eid, s.n, sid))
+            else:
+                sid = c.execute("INSERT INTO sensores (ieee, equipo_id, numero, nombre) VALUES (?,?,?,?)",
+                                (ieee, eid, s.n, (s.nombre.strip() or f"Sensor {s.n}")[:40])).lastrowid
+            if s.temp is None and s.hum is None:
+                continue  # el sensor aún no reporta desde que arrancó el equipo
+            fecha = (base - timedelta(seconds=s.edad_s)).replace(microsecond=0)
+            # El mismo reporte llega en cada envío (cada minuto) con ±1 s de diferencia: se guarda una vez.
+            r = c.execute("""INSERT INTO lecturas_wifi (sensor_id, fecha, temperatura, humedad, bateria)
+                             SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (
+                                 SELECT 1 FROM lecturas_wifi WHERE sensor_id=? AND fecha BETWEEN ? AND ?)
+                             ON CONFLICT (sensor_id, fecha) DO NOTHING""",
+                          (sid, fecha, s.temp, s.hum, s.bat if s.bat is not None and s.bat >= 0 else None,
+                           sid, fecha - timedelta(seconds=5), fecha + timedelta(seconds=5)))
+            nuevas += r.rowcount
+    return {"ok": True, "lecturas_nuevas": nuevas}
 
 
 # ------------------------------------------------------------------ eventos de los equipos
@@ -515,6 +668,7 @@ def depurar() -> int:
         n = c.execute(f"DELETE FROM excursiones WHERE coalesce(revisada_en, inicio) < {limite} "
                       f"AND coalesce(fin, inicio) < {limite}", plazo * 2).rowcount
         n += c.execute(f"DELETE FROM lecturas WHERE fecha < {limite}", plazo).rowcount
+        n += c.execute(f"DELETE FROM lecturas_wifi WHERE fecha < {limite}", plazo).rowcount
         n += c.execute(f"DELETE FROM eventos WHERE fecha < {limite}", plazo).rowcount
         n += c.execute(f"""DELETE FROM importaciones i WHERE creado_en < {limite}
                            AND NOT EXISTS (SELECT 1 FROM lecturas WHERE importacion_id = i.id)

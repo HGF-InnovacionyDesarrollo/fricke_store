@@ -3,7 +3,9 @@ Las reglas comunes (sesión, perfiles, ícono, diseño, Ley 21.719) ya las prueb
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi.testclient import TestClient
 
+import app as portal
 from conftest import cliente, habilitar_modulo, nuevo_usuario
 from modulos.datalogger.lectura_csv import firma, hora_chile_a_utc, leer_archivo, utc_a_hora_chile
 
@@ -169,3 +171,67 @@ def test_configurador_registra_en_bitacora(personas):
     # Un equipo que el portal aún no conoce no se crea: solo queda en la bitácora
     assert tc.post(f"{API}/configurador/registro", json={**accion, "equipo": "MTH-99"}).status_code == 200
     assert not any(e["codigo"] == "MTH-99" for e in tc.get(f"{API}/sensores").json()["equipos"])
+
+
+# ------------------------------------------------------------------ envío por WiFi (firmware 2.1)
+def envio(codigo="MTH-95", unix=None, edad=30, temp=21.4, hum=48, ieee="A4C13880C7479501"):
+    return {"monitor": codigo, "serie": "E8F60AFFFEF7EE48", "firmware": "2.1", "seq": 3,
+            "unix": int(unix if unix is not None else datetime.now(timezone.utc).timestamp()),
+            "uptime_s": 200, "rssi": -48, "heap": 85000, "zb_reportes": 4, "envios_ok": 2, "envios_falla": 0,
+            "sensores": [{"n": 1, "ieee": ieee, "nombre": "Sensor 1", "temp": temp, "hum": hum, "edad_s": edad,
+                          "bat": 90, "alarma_t": 0, "alarma_h": 0},
+                         {"n": 2, "ieee": "A4C13880C7479502", "nombre": "Sensor 2", "temp": None, "hum": None,
+                          "edad_s": 0, "bat": -1, "alarma_t": 0, "alarma_h": 0}]}
+
+
+def test_envio_wifi_con_credencial_de_equipo(personas):
+    admin, func = personas
+    tc = cliente(admin)
+    # Solo quien configura equipos habilita el envío
+    assert cliente(func).post(f"{API}/envio-wifi", json={"equipo": "MTH-95"}).status_code == 403
+    r = tc.post(f"{API}/envio-wifi", json={"equipo": "MTH-95"})
+    assert r.status_code == 200 and len(r.json()["secreto"]) == 24
+    secreto = r.json()["secreto"]
+
+    equipo = TestClient(portal.app)  # un aparato: sin cookie ni cabecera anti-CSRF
+    assert equipo.post(f"{API}/equipo", json=envio()).status_code == 401
+    assert equipo.post(f"{API}/equipo", json=envio(), auth=("equipo", "otra-clave")).status_code == 401
+    r = equipo.post(f"{API}/equipo", json=envio(), auth=("equipo", secreto))  # Basic, como lo arma el ESP32
+    assert r.status_code == 200 and r.json()["lecturas_nuevas"] == 1
+    # El envío siguiente (un minuto después, mismo reporte del sensor) no repite la lectura
+    otro = envio(unix=datetime.now(timezone.utc).timestamp() + 60, edad=91)
+    assert equipo.post(f"{API}/equipo", json=otro, headers={"Authorization": f"Bearer {secreto}"}).json()["lecturas_nuevas"] == 0
+    # La credencial es de un equipo: no sirve para mandar datos a nombre de otro
+    assert equipo.post(f"{API}/equipo", json=envio("MTH-96"), auth=("equipo", secreto)).status_code == 403
+
+    resumen = tc.get(f"{API}/resumen").json()
+    eq = next(e for e in resumen["equipos"] if e["codigo"] == "MTH-95")
+    s1 = next(s for s in eq["sensores"] if s["nombre"] == "Sensor 1")
+    assert s1["origen"] == "wifi" and s1["temperatura"] == 21.4 and eq["wifi"]["conectado"]
+    # El detalle muestra lo recibido como "en vivo", fuera de las estadísticas oficiales (SD)
+    serie = tc.get(f"{API}/sensores/{s1['id']}/serie").json()
+    assert len(serie["en_vivo"]) == 1 and serie["temperatura"]["n"] == 0
+
+    lista = tc.get(f"{API}/envio-wifi").json()
+    cred = next(e for e in lista["equipos"] if e["equipo"] == "MTH-95")
+    assert cred["ultimo_uso"] and cred["wifi_rssi"] == -48 and lista["ruta"] == f"{API}/equipo"
+    # Un sensor que solo llega por WiFi no trae tipo de almacenamiento: se fija en Sensores y entonces tiene estado
+    med = next(p for p in tc.get(f"{API}/sensores").json()["perfiles"] if p["clave"] == "MED")
+    assert tc.put(f"{API}/sensores/{s1['id']}", json={"ubicacion": "Farmacia", "activo": True, "perfil_id": 9999}).status_code == 422
+    assert tc.put(f"{API}/sensores/{s1['id']}", json={"ubicacion": "Farmacia", "activo": True, "perfil_id": med["id"]}).status_code == 200
+    assert tc.put(f"{API}/sensores/{s1['id']}", json={"ubicacion": "Farmacia", "activo": True}).status_code == 200  # sin perfil_id: no cambia
+    eq = next(e for e in tc.get(f"{API}/resumen").json()["equipos"] if e["codigo"] == "MTH-95")
+    assert next(s for s in eq["sensores"] if s["id"] == s1["id"])["perfil"] == "Medicamentos"
+    # Anulada, deja de servir
+    assert tc.delete(f"{API}/envio-wifi/{cred['id']}").status_code == 200
+    assert equipo.post(f"{API}/equipo", json=envio(), auth=("equipo", secreto)).status_code == 401
+
+
+def test_envio_wifi_con_sesion_sigue_exigiendo_cabecera_anti_csrf(personas):
+    admin, _ = personas
+    secreto = cliente(admin).post(f"{API}/envio-wifi", json={"equipo": "MTH-97"}).json()["secreto"]
+    navegador = TestClient(portal.app)
+    navegador.post("/api/auth/login", json={"rut": admin["rut"], "clave": "frase de prueba muy larga y segura"},
+                   headers={"X-Ecosistema": "1"})
+    r = navegador.post(f"{API}/equipo", json=envio("MTH-97"), auth=("equipo", secreto))
+    assert r.status_code == 403

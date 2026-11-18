@@ -37,8 +37,12 @@ TIPOS_SOLICITUD = {
 async def cabeceras(request: Request, call_next):
     # Protección CSRF simple: toda escritura a la API debe venir con esta cabecera
     # (un formulario de otro sitio no puede ponerla) y la cookie es SameSite=Strict.
+    # Excepción: las rutas de equipo (/api/m/<clave>/equipo) las llaman aparatos con su credencial en la cabecera
+    # Authorization y sin cookie de sesión (con cookie se exige la cabecera igual), así que no son atacables por CSRF (ver plataforma.acceso_equipo).
     if request.url.path.startswith("/api/") and request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        if request.headers.get("x-ecosistema") != "1":
+        de_equipo = (re.match(r"^/api/m/[a-z0-9_]+/equipo(/|$)", request.url.path)
+                     and not request.cookies.get(cfg.COOKIE_NOMBRE))
+        if request.headers.get("x-ecosistema") != "1" and not de_equipo:
             return JSONResponse({"detail": "Solicitud no permitida."}, status_code=403)
     r = await call_next(request)
     r.headers["X-Content-Type-Options"] = "nosniff"
