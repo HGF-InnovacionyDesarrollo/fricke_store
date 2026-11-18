@@ -1,0 +1,114 @@
+/* Estilos de Data+. Solo variables de base.css; el color de la familia va solo en el ícono. */
+
+/* ---------- resumen ---------- */
+.aviso-datos { max-width: 960px; margin: 0 0 16px; }
+.aviso-alarmas { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 960px; margin: 0 0 24px; text-align: left;
+  font: inherit; font-size: 14px; line-height: 20px; color: var(--texto); cursor: pointer; border-color: var(--peligro); }
+.aviso-alarmas .linea { color: var(--peligro); flex: none; }
+.aviso-alarmas:hover { background: var(--hover); }
+.grupo-equipo { margin: 0 0 24px; }
+.grilla-sensores { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.sensor { display: flex; flex-direction: column; gap: 8px; text-align: left; font: inherit; color: var(--texto); cursor: pointer; min-height: 160px; }
+.sensor:hover { background: var(--hover); }
+.sensor:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; }
+.sensor.estado-alarma { border: 2px solid var(--peligro); padding: 15px; }
+.sensor-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.sensor-nombre { font-size: 16px; line-height: 24px; font-weight: 500; }
+.sensor-sub { font-size: 14px; line-height: 20px; color: var(--texto-2); margin: 0 0 16px; }
+.sensor .sensor-sub { margin: 0; color: var(--texto-3); font-size: 12px; line-height: 16px; }
+.sensor-valores { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+.valor { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: var(--texto-2); }
+.valor b { font-size: 28px; line-height: 36px; font-weight: 400; color: var(--texto); }
+.valor .linea { width: 18px; height: 18px; color: var(--texto-3); }
+.valor.alarma b, .valor.alarma .linea { color: var(--peligro); }
+.sensor-aviso { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--texto-2); }
+.sensor-aviso .linea { width: 16px; height: 16px; }
+.sensor-pie { margin-top: auto; font-size: 12px; line-height: 16px; color: var(--texto-3); }
+
+/* Estado: siempre con ícono y palabra, no solo color */
+.chip-estado { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 24px; padding: 0 8px; border-radius: 12px;
+  font-size: 12px; line-height: 16px; font-weight: 500; border: 1px solid var(--borde); color: var(--texto-2); white-space: nowrap; }
+.chip-estado .linea { width: 14px; height: 14px; }
+.chip-estado.normal { color: var(--ok); border-color: var(--ok); }
+.chip-estado.atencion { color: var(--texto); border-color: var(--texto-2); }
+.chip-estado.alarma { color: var(--peligro); border-color: var(--peligro); }
+
+/* ---------- detalle de sensor ---------- */
+.filtros { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: flex-start; max-width: 960px; }
+.filtros .campo { width: 180px; margin-bottom: 16px; }
+.atajos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; padding-top: 4px; }
+.acciones-informe { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.acciones-informe .btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.acciones-informe .linea { width: 18px; height: 18px; }
+.grilla-estad { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 0 0 16px; max-width: 1200px; }
+.estad-etq { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--texto-3); }
+.estad-valor { font-size: 22px; line-height: 28px; margin-top: 4px; }
+.estad-ayuda { font-size: 12px; line-height: 16px; color: var(--texto-3); margin-top: 4px; }
+.bloque-grafico { margin: 0 0 16px; max-width: 1200px; }
+.grafico { width: 100%; height: auto; display: block; overflow: visible; }
+.grafico .banda-ok { fill: var(--ok); fill-opacity: .12; }
+.grafico .rejilla { stroke: var(--borde-suave); stroke-width: 1; }
+.grafico .lim-alarma { stroke: var(--peligro); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.grafico .serie { fill: none; stroke: var(--primario); stroke-width: 2; stroke-linejoin: round; }
+.grafico circle.serie { fill: var(--primario); }
+.grafico .etq-eje, .grafico .etq-lim { font-size: 13px; fill: var(--texto-3); font-family: var(--fuente); }
+.grafico .etq-lim { fill: var(--peligro); }
+.leyenda { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; line-height: 16px; color: var(--texto-2); margin-top: 8px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--primario); }
+.leyenda .m-banda { height: 10px; border: 0; background: var(--ok); opacity: .25; }
+.leyenda .m-alarma { border-top: 2px dashed var(--peligro); }
+.bloque-excursiones { max-width: 960px; margin: 24px 0 0; }
+.pie-informe { font-size: 12px; line-height: 16px; color: var(--texto-3); margin: 24px 0 0; }
+
+/* ---------- alarmas ---------- */
+.segmentos { display: inline-flex; border: 1px solid var(--borde); border-radius: 20px; overflow: hidden; margin: 0 0 12px; }
+.segmento { font: inherit; font-size: 14px; font-weight: 500; height: 40px; padding: 0 16px; border: 0; background: none; color: var(--texto); cursor: pointer; }
+.segmento + .segmento { border-left: 1px solid var(--borde); }
+.segmento[aria-pressed="true"] { background: var(--primario-suave); color: var(--texto); }
+.lista { display: grid; gap: 12px; max-width: 960px; }
+.alarma-cab { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.alarma-que { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; line-height: 24px; font-weight: 500; }
+.alarma-que .linea { width: 20px; height: 20px; color: var(--peligro); }
+.alarma-sensor { font-size: 14px; line-height: 20px; color: var(--texto-2); margin: 4px 0 12px; }
+.alarma-datos, .resultado { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 14px; line-height: 20px; }
+.alarma-datos dt, .resultado dt { color: var(--texto-3); }
+.alarma-datos dd, .resultado dd { margin: 0; }
+.alarma-revision { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--borde-suave); font-size: 14px; line-height: 20px; white-space: pre-wrap; }
+.alarma-revision b { font-weight: 500; }
+.alarma-pie { margin-top: 12px; display: flex; justify-content: flex-end; }
+
+/* ---------- tablas ---------- */
+.equipo { margin: 0 0 16px; max-width: 1200px; }
+.tabla-envoltura { overflow-x: auto; max-width: 1200px; }
+.tabla-envoltura.tarjeta { padding: 0; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+.tabla th { text-align: left; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--texto-3); padding: 12px; border-bottom: 1px solid var(--borde); }
+.tabla td { padding: 8px 12px; border-bottom: 1px solid var(--borde-suave); vertical-align: top; }
+.tabla tr:last-child td { border-bottom: 0; }
+.tabla small { color: var(--texto-3); font-size: 12px; }
+.nowrap { white-space: nowrap; }
+
+/* ---------- diálogos ---------- */
+.campo-archivo { margin: 0 0 20px; display: grid; gap: 8px; font-size: 14px; }
+.campo-archivo label { font-weight: 500; }
+.casilla { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 20px; margin: 0 0 16px; }
+.casilla input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; }
+
+/* ---------- acerca ---------- */
+.ficha { max-width: 760px; margin: 0 0 16px; }
+.ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; font-size: 14px; line-height: 20px; }
+.ficha dt { color: var(--texto-3); }
+.ficha dd { margin: 0; }
+
+@media (max-width: 600px) {
+  .filtros .campo { width: calc(50% - 6px); }
+  .ficha dl, .alarma-datos { grid-template-columns: 1fr; }
+  .ficha dd, .alarma-datos dd { margin-bottom: 8px; }
+}
+
+/* ---------- informe impreso ---------- */
+@media print {
+  .filtros, .acciones-informe, .alarma-pie, #volver { display: none !important; }
+  .tarjeta { break-inside: avoid; }
+}
