@@ -1,4 +1,4 @@
-// Data+ según las directrices de diseño (docs/diseno/, Parte 3): iniciarModulo, cuatro estados, esc() y api().
+// F+data según las directrices de diseño (docs/diseno/, Parte 3): iniciarModulo, cuatro estados, esc() y api().
 // Pantallas: Resumen (y detalle de un sensor en /resumen/<id>), Alarmas, Equipos y sensores, Eventos,
 // Importaciones y Acerca del módulo. Los gráficos son SVG propios: sin bibliotecas ni recursos de Internet.
 "use strict";
@@ -81,7 +81,7 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     try { const d = await api(ruta); cargando(false); return d; }
     catch (e) {
       cargando(false);
-      if (e.status === 403) estadoSinPermiso(contenedor, "Necesitas el permiso para ver Data+.");
+      if (e.status === 403) estadoSinPermiso(contenedor, "Necesitas el permiso para ver F+data.");
       else if (e.status === 404) estadoVacio(contenedor, "No lo encontramos", "Puede que se haya quitado. Vuelve al resumen.");
       else estadoError(contenedor, `No pudimos cargar ${queCosa}.`, reintentar);
       return null;
@@ -160,7 +160,7 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     if (!d) return;
     const s = d.sensor, p = d.perfil;
     document.getElementById("titulo-sensor").textContent = s.nombre;
-    document.title = `${s.nombre} · Data+`;
+    document.title = `${s.nombre} · F+data`;
     const sub = [s.ubicacion, `Equipo ${s.equipo}`, p ? `${p.nombre} (${p.referencia})` : "Sin tipo de almacenamiento"].filter(Boolean).join(" · ");
     if (!d.lecturas.length) {
       zona.innerHTML = `<p class="sensor-sub">${esc(sub)}</p><div id="vacio"></div>`;
@@ -183,7 +183,7 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
       ${H.n ? `<section class="tarjeta bloque-grafico"><h2 class="titulo-seccion">Humedad relativa (%)</h2>${grafico(d, "humedad", "h")}</section>` : ""}
       <section class="bloque-excursiones"><h2 class="titulo-seccion">Alarmas del período</h2>
         ${d.excursiones.length ? `<div class="lista">${d.excursiones.map(tarjetaAlarma).join("")}</div>` : `<p class="sensor-sub">No hubo valores fuera del rango de alarma.</p>`}</section>
-      <p class="pie-informe">Informe generado el ${esc(fechaLocal(new Date().toISOString()))} desde Data+. Valores con la corrección de calibración ya aplicada.</p>`;
+      <p class="pie-informe">Informe generado el ${esc(fechaLocal(new Date().toISOString()))} desde F+data. Valores con la corrección de calibración ya aplicada.</p>`;
     document.getElementById("imprimir").onclick = () => print();
     activarRevisiones(zona, () => pintarSensor(sid, desde, hasta));
   }

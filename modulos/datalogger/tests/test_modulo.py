@@ -1,4 +1,4 @@
-"""Pruebas propias de Data+: lo que hace y quién puede hacerlo. Correr con `pytest modulos/datalogger`.
+"""Pruebas propias de F+data: lo que hace y quién puede hacerlo. Correr con `pytest modulos/datalogger`.
 Las reglas comunes (sesión, perfiles, ícono, diseño, Ley 21.719) ya las prueba tests/test_reglas_modulos.py."""
 from datetime import datetime, timedelta, timezone
 

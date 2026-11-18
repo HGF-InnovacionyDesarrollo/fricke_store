@@ -1,4 +1,4 @@
-"""API de Data+, montada en /api/m/datalogger/. Todo endpoint usa Depends(acceso(...)).
+"""API de F+data, montada en /api/m/datalogger/. Todo endpoint usa Depends(acceso(...)).
 
 Los datos llegan al importar los CSV de la tarjeta SD de cada equipo (los Monitor T/H no tienen red). Cuando los
 equipos puedan enviar datos solos, se necesitará una credencial de equipo común del portal (ver README).
@@ -459,7 +459,7 @@ def _datos_equipo(c, equipo_id: int, detalle: str):
 
 # ------------------------------------------------------------------ Ley 21.719 (guarda ids de funcionarios)
 def exportar_titular(usuario_id: int) -> dict:
-    """Lo que Data+ guarda de la persona. Se suma a 'Descargar mis datos' en Mi cuenta."""
+    """Lo que F+data guarda de la persona. Se suma a 'Descargar mis datos' en Mi cuenta."""
     with bd_modulo(CLAVE) as c:
         return {
             "importaciones": [dict(f) for f in c.execute(
