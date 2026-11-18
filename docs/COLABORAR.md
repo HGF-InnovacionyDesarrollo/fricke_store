@@ -19,6 +19,8 @@ Instala:
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para la base de datos de desarrollo)
 - Opcional: [Claude Code](https://claude.com/claude-code). Dentro del proyecto, escribe `/nuevo-modulo` (o simplemente
   pide "haz un módulo de…"): Claude sigue paso a paso todas las directrices, corre las pruebas y prepara la entrega.
+  Al abrir la carpeta del proyecto, Claude lee solo el archivo `CLAUDE.md` con todas las reglas: no necesitas
+  copiarle instrucciones.
 
 Luego, en una terminal:
 
