@@ -461,8 +461,9 @@ class Modulo(BaseModel):
 
 
 def _validar_modulo(m: Modulo):
-    if not re.fullmatch(r"[a-z0-9-]{2,40}", m.clave):
-        raise HTTPException(400, "La clave usa solo minúsculas, números y guiones.")
+    # Los módulos con código usan guion bajo en su clave (ej.: monitoreo_fetal), igual que plataforma.CLAVE_VALIDA.
+    if not re.fullmatch(r"[a-z0-9_-]{2,40}", m.clave):
+        raise HTTPException(400, "La clave usa solo minúsculas, números, guiones y guiones bajos.")
     if not (m.url.startswith("/") or m.url.startswith("https://") or m.url.startswith("http://")):
         raise HTTPException(400, "La URL debe empezar con / o con http(s)://.")
     if not re.fullmatch(r"#[0-9a-fA-F]{6}", m.color):

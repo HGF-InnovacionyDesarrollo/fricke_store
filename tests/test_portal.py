@@ -76,3 +76,13 @@ def test_modulos_visibles_solo_para_su_perfil(funcionario):
     assert all(m["clave"] != clave for m in cliente(funcionario).get("/api/modulos").json())
     habilitar_modulo(clave, "funcionario")
     assert any(m["clave"] == clave for m in cliente(funcionario).get("/api/modulos").json())
+
+
+def test_panel_activa_modulo_con_guion_bajo_en_la_clave(admin):
+    """Las claves de módulo llevan guion bajo (monitoreo_fetal): el panel debe poder activarlos."""
+    tc = cliente(admin)
+    m = next(x for x in tc.get("/api/admin/modulos").json() if x["clave"] == "monitoreo_fetal")
+    r = tc.put(f"/api/admin/modulos/{m['id']}", json={**m, "activo": True})
+    assert r.status_code == 200, r.text
+    assert next(x for x in tc.get("/api/admin/modulos").json() if x["clave"] == "monitoreo_fetal")["activo"]
+    tc.put(f"/api/admin/modulos/{m['id']}", json={**m, "activo": False})
