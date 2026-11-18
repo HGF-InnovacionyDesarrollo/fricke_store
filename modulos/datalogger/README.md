@@ -16,6 +16,7 @@ de Lucide.
 | Sensores | Código, serie y firmware de cada equipo; ubicación y estado de cada sensor. |
 | Eventos | Registro de los equipos: arranques, alarmas, cortes de luz, tarjeta SD, calibración, etc. |
 | Archivos | Quién importó qué, cuántas mediciones eran nuevas y si las firmas estaban correctas. |
+| Configurador | Configura un Monitor T/H conectado por USB al PC, igual que el Configurador de Windows (ver abajo). |
 
 Rangos por tipo de almacenamiento (los mismos del firmware): **Medicamentos** (APF 1.5) normal 16 a 24 °C, alarma bajo
 15 o sobre 30 °C, humedad normal hasta 55 %, alarma sobre 60 %; **Material estéril** (APE 1.4) normal 19 a 23 °C,
@@ -35,6 +36,25 @@ Los Monitor T/H no tienen red. Se importan los CSV de las carpetas `datos/` y `e
 Límite conocido: en la hora repetida del cambio a horario de invierno (primer sábado de abril), las mediciones de esa
 hora se toman como repetidas.
 
+## Configurador de equipos (USB)
+
+Trae al portal el Configurador de Windows de `Monitor_TH/configurador` (mismo protocolo, firmware 2.0 o posterior):
+
+- **Equipo**: estado (hora y diferencia con el PC, tarjeta SD, energía, sensores, WiFi), poner la hora del PC, abrir la
+  red para emparejar (3 min) y reiniciar.
+- **Configuración**: código, modelo de pantalla, alarmas que suenan y WiFi (red, clave, servidor).
+- **Sensores**: nombre, tipo de almacenamiento, oculto, corrección de calibración (límites ±3 °C y ±15 % HR) y fecha;
+  quitar la configuración.
+- **Registro**: últimos eventos, guardar y cargar la configuración en un archivo JSON (compatible con el de Windows),
+  ver la clave de firma (para pegarla al importar) y la consola del monitor.
+
+Funciona con **Chrome o Edge** en el PC donde está enchufado el monitor (Web Serial; la dirección debe ser `localhost`
+o `https`). La conexión la hace el navegador: el servidor no ve el puerto USB. Al portal solo llega qué se cambió, para
+la bitácora (`datalogger_equipo_configurado`, sin la clave ni el contenido), y se actualizan la serie y el firmware
+del equipo si ya existe. **Instalar firmware sigue en el Configurador de Windows** (necesita esptool).
+
+El portal todavía no recibe los envíos por WiFi del firmware 2.1: falta la credencial de equipo (ver Pendiente).
+
 ## Permisos
 
 | Permiso | Funcionario | Administrador |
@@ -43,6 +63,7 @@ hora se toman como repetidas.
 | `datalogger.importar` | | Sí |
 | `datalogger.revisar` | | Sí |
 | `datalogger.configurar` | | Sí |
+| `datalogger.equipos` (configurador USB) | | Sí |
 
 A los encargados de Farmacia, Esterilización o Calidad se les otorgan uno a uno, por ejemplo:
 `python backend/gestionar.py permiso --rut … --permiso datalogger.revisar`.

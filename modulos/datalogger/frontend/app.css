@@ -80,7 +80,7 @@
 
 /* ---------- tablas ---------- */
 .equipo { margin: 0 0 16px; max-width: 1200px; }
-.tabla-envoltura { overflow-x: auto; max-width: 1200px; }
+.tabla-envoltura { overflow-x: auto; max-width: 1200px; position: relative; }  /* contiene el texto oculto .sr */
 .tabla-envoltura.tarjeta { padding: 0; }
 .tabla { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
 .tabla th { text-align: left; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--texto-3); padding: 12px; border-bottom: 1px solid var(--borde); }
@@ -101,10 +101,42 @@
 .ficha dt { color: var(--texto-3); }
 .ficha dd { margin: 0; }
 
+/* ---------- configurador (USB) ---------- */
+.conexion { max-width: 1200px; margin: 0 0 16px; }
+.conexion-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.conexion-cab .sensor-sub { margin: 4px 0 0; }
+.conexion-cab .btn, .acciones-informe .btn { display: inline-flex; align-items: center; gap: 8px; }
+.conexion-cab .linea { width: 18px; height: 18px; }
+.zona-usb .segmentos { margin: 0 0 16px; flex-wrap: wrap; }
+.zona-usb .aviso-suave { max-width: 1200px; }
+.grilla-usb { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; max-width: 1200px; margin: 0 0 16px; }
+.grilla-usb .ficha { margin: 0; max-width: none; }
+.tono-ok { color: var(--ok); }
+.tono-alerta { color: var(--peligro); font-weight: 500; }
+.tono-aviso { font-weight: 500; }
+.tono-alerta .linea { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+.form-usb { max-width: 640px; margin: 0 0 16px; }
+.grupo-opciones { border: 0; padding: 0; margin: 0 0 16px; }
+.grupo-opciones legend { font-size: 14px; line-height: 20px; font-weight: 500; margin: 0 0 8px; padding: 0; }
+.grupo-opciones .casilla { margin: 0 0 8px; }
+.grupo-opciones .ayuda { font-size: 12px; line-height: 16px; color: var(--texto-3); }
+.pie-form { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.estado-wifi { font-size: 14px; line-height: 20px; margin: 0 0 16px; }
+.fila-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.tabla tr.apagado td { color: var(--texto-3); }
+.tabla .btn-icono .linea { width: 18px; height: 18px; }
+.bloque-usb { max-width: 1200px; margin: 0 0 16px; }
+.texto-usb { font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 18px; white-space: pre-wrap; word-break: break-all;
+  max-height: 320px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--borde-suave); border-radius: 8px; background: var(--fondo); color: var(--texto); }
+.texto-usb.tenue { color: var(--texto-2); max-height: 200px; }
+.clave-usb { font-size: 14px; user-select: all; }
+
 @media (max-width: 600px) {
   .filtros .campo { width: calc(50% - 6px); }
   .ficha dl, .alarma-datos { grid-template-columns: 1fr; }
   .ficha dd, .alarma-datos dd { margin-bottom: 8px; }
+  .fila-campos { grid-template-columns: 1fr; }
+  .conexion-cab .btn { width: 100%; justify-content: center; }
 }
 
 /* ---------- informe impreso ---------- */
