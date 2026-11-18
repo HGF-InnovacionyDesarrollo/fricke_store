@@ -27,7 +27,7 @@ INTERVALO_MIN = 5           # una fila cada 5 min por sensor
 MAX_DIAS_SERIE = 92
 DELTA_H_R = 10_000.0        # ΔH/R = 83,144 kJ/mol ÷ 8,3144 J/(mol·K), valor estándar para la temperatura cinética media
 
-VER, IMPORTAR, REVISAR, CONFIGURAR = (f"{CLAVE}.{p}" for p in ("ver", "importar", "revisar", "configurar"))
+VER, IMPORTAR, REVISAR, CONFIGURAR, EQUIPOS = (f"{CLAVE}.{p}" for p in ("ver", "importar", "revisar", "configurar", "equipos"))
 
 
 # ------------------------------------------------------------------ utilidades
@@ -306,6 +306,43 @@ def actualizar_sensor(sid: int, d: CambioSensor, ctx: ContextoModulo = Depends(a
         _sensor(c, sid)
         c.execute("UPDATE sensores SET ubicacion=?, activo=(?::int = 1) WHERE id=?", (d.ubicacion.strip(), d.activo, sid))
     ctx.auditar(f"{CLAVE}_sensor_actualizado", f"sensor #{sid}{'' if d.activo else ' (fuera de servicio)'}")
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ configurador por USB
+# La conexión con el equipo la hace el navegador (Web Serial): el portal no ve el puerto USB. Este endpoint solo deja
+# constancia en la bitácora de lo que se cambió y actualiza la serie y el firmware del equipo si ya existe.
+ACCIONES_USB = {
+    "hora": "hora puesta desde el PC",
+    "emparejar": "red abierta para emparejar",
+    "reiniciar": "reiniciado",
+    "equipo": "configuración del equipo guardada",
+    "sensor": "configuración de un sensor guardada",
+    "sensor_quitado": "configuración de un sensor quitada",
+    "wifi": "WiFi guardado",
+    "wifi_borrado": "WiFi desactivado",
+    "clave_leida": "clave de firma leída",
+    "respaldo_aplicado": "configuración cargada desde un archivo",
+}
+
+
+class AccionUSB(BaseModel):
+    equipo: str = Field(min_length=1, max_length=16, pattern=r"^[A-Za-z0-9 _.-]+$")
+    serie: str = Field(default="", max_length=32, pattern=r"^([0-9A-Fa-f]{8,32})?$")
+    firmware: str = Field(default="", max_length=16, pattern=r"^[0-9A-Za-z._-]*$")
+    accion: str = Field(max_length=20)
+
+
+@router.post("/configurador/registro")
+def registrar_accion_usb(d: AccionUSB, ctx: ContextoModulo = Depends(acceso(CLAVE, EQUIPOS))):
+    if d.accion not in ACCIONES_USB:
+        raise HTTPException(422, "Acción no reconocida.")
+    codigo = d.equipo.strip()
+    with bd_modulo(CLAVE) as c:
+        if d.serie or d.firmware:
+            c.execute("UPDATE equipos SET serie=COALESCE(NULLIF(?, ''), serie), firmware=COALESCE(NULLIF(?, ''), firmware) "
+                      "WHERE codigo=?", (d.serie.upper(), d.firmware, codigo))
+    ctx.auditar(f"{CLAVE}_equipo_configurado", f"equipo {codigo}: {ACCIONES_USB[d.accion]}")
     return {"ok": True}
 
 

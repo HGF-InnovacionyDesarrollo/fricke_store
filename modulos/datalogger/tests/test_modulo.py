@@ -151,3 +151,21 @@ def test_descarga_csv(personas):
                if s["ieee"].endswith("9106"))
     r = cliente(func).get(f"{API}/sensores/{sid}/csv?desde=2026-10-15&hasta=2026-10-15")
     assert r.status_code == 200 and "21,3" in r.text and "2026-10-15 08:00" in r.text
+
+
+# ------------------------------------------------------------------ configurador por USB (solo bitácora)
+def test_configurador_registra_en_bitacora(personas):
+    admin, func = personas
+    tc = cliente(admin)
+    importar(tc, [("d.csv", datos_dia("2026-10-16", [21.0], equipo="MTH-94", ieee="A4:C1:38:80:C7:47:91:07"))])
+    accion = {"equipo": "MTH-94", "serie": "98A316FFFE9BB2EC", "firmware": "2.1", "accion": "sensor"}
+    # El funcionario no configura equipos
+    assert cliente(func).post(f"{API}/configurador/registro", json=accion).status_code == 403
+    assert tc.post(f"{API}/configurador/registro", json=accion).status_code == 200
+    assert tc.post(f"{API}/configurador/registro", json={**accion, "accion": "borrar_todo"}).status_code == 422
+    assert tc.post(f"{API}/configurador/registro", json={**accion, "equipo": "MTH|94"}).status_code == 422
+    equipo = next(e for e in tc.get(f"{API}/sensores").json()["equipos"] if e["codigo"] == "MTH-94")
+    assert equipo["serie"] == "98A316FFFE9BB2EC" and equipo["firmware"] == "2.1"
+    # Un equipo que el portal aún no conoce no se crea: solo queda en la bitácora
+    assert tc.post(f"{API}/configurador/registro", json={**accion, "equipo": "MTH-99"}).status_code == 200
+    assert not any(e["codigo"] == "MTH-99" for e in tc.get(f"{API}/sensores").json()["equipos"])
