@@ -86,13 +86,13 @@ Los módulos viven en `modulos/<clave>/` y siguen las **[directrices para módul
 con RUT, la cabecera con el logo, la bitácora encadenada y los respaldos, y declaran su ficha de tratamiento (Ley 21.719).
 
 ```bash
-python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2   # parte desde el módulo de ejemplo
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "F+farmacia" --familia 2   # parte desde el módulo de ejemplo
 python backend/gestionar.py modulos                                             # valida, migra y lista
 ```
 
 Al reiniciar el portal el módulo se registra solo, **inactivo**. Se publica en **Administración › Módulos** eligiendo quién lo ve.
 Si trata datos de salud, no aparecerá hasta que el DPD apruebe la evaluación de impacto.
-El ejemplo de referencia es `modulos/ejemplo/` (Tablón de avisos).
+El ejemplo de referencia es `modulos/ejemplo/` (F+avisos).
 
 También se pueden registrar enlaces a sistemas externos desde **Administración › Módulos › Agregar módulo**, con su ficha de tratamiento.
 

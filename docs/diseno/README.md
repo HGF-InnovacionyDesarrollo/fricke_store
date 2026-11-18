@@ -1,7 +1,14 @@
 # Directrices de diseño
 
 Documentos oficiales de diseño del ecosistema, entregados por la Unidad de Innovación y Desarrollo (17 nov 2026).
-**Son obligatorios para todo módulo** y prevalecen sobre cualquier otra indicación de diseño en este repositorio.
+**Son obligatorios para todo módulo** y prevalecen sobre cualquier otra indicación de diseño en este repositorio,
+salvo las reglas posteriores de la Unidad que se listan en este archivo.
+
+## Reglas posteriores de la Unidad
+
+| Fecha | Regla |
+|---|---|
+| 18 nov 2026 | Todo módulo se llama **«F+» y su nombre corto**, en una palabra y en minúsculas: `F+data`, `F+farmacia`. Reemplaza la regla de nombre de los PDF («una o dos palabras, mayúscula solo inicial»). La revisión automática rechaza otro formato. |
 
 | Documento | Contenido |
 |---|---|
@@ -21,7 +28,7 @@ máx. 3 elementos, sin texto) centrado en una caja de 24. Cinco familias:
 | 4 Operaciones y equipos | #58A87A → #C3AD55 | Tinta #2B3440 |
 | 5 Personas y gestión | #C7AD53 → #FCB040 | Tinta #2B3440 |
 
-Nombre en Outfit 500, tinta, sin degradado; una o dos palabras, mayúscula solo inicial, sin "Fricke", "App" ni "Sistema".
+Nombre en Outfit 500, tinta, sin degradado. **Nombre: «F+» y el nombre corto del módulo**, en una sola palabra y en minúsculas (ej.: `F+data`, `F+farmacia`); sin «fricke», «app» ni «sistema». Regla de la Unidad del 18 nov 2026: reemplaza la regla de nombre de los PDF de diseño. El archivo del ícono queda como `f-<nombre>` (ej.: `f-data.svg`).
 Archivos en `docs/logo/modulos/<nombre>/` y copia en `frontend/img/modulos/<nombre>.svg`.
 
 **Interfaz.** Como una app de Google Workspace sobre Material Design 3, sobria:

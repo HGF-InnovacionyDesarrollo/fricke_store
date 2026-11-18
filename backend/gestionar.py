@@ -15,7 +15,7 @@ Todos los comandos actúan sobre el establecimiento de ECO_ESTABLECIMIENTO (por 
 
 Módulos (ver docs/MODULOS.md):
   python backend/gestionar.py modulos                             # valida, migra y lista los módulos con código
-  python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2 [--pictograma pill.svg]
+  python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "F+farmacia" --familia 2 [--pictograma pill.svg]
   python backend/gestionar.py permiso --rut 12.345.678-5 --permiso ejemplo.moderar [--revocar]
   python backend/gestionar.py depurar                             # aplica los plazos de conservación (a diario)
 
@@ -282,7 +282,7 @@ def _nuevo_modulo(clave: str, nombre: str, familia: int, pictograma: str | None)
         if archivo.is_file() and archivo.suffix in (".py", ".js", ".html", ".css", ".sql", ".md"):
             t = archivo.read_text(encoding="utf-8")
             t = t.replace('CLAVE = "ejemplo"', f'CLAVE = "{clave}"').replace("/m/ejemplo/", f"/m/{clave}/")
-            t = t.replace('const CLAVE = "ejemplo";', f'const CLAVE = "{clave}";').replace("Tablón de avisos", nombre)
+            t = t.replace('const CLAVE = "ejemplo";', f'const CLAVE = "{clave}";').replace("F+avisos", nombre)
             t = t.replace("    familia=5,", f"    familia={familia},")
             archivo.write_text(t, encoding="utf-8")
     # Ícono según las directrices: baldosa de la familia + pictograma (provisional si no se entregó uno)

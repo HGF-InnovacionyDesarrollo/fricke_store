@@ -42,7 +42,7 @@ http://localhost:8090. Usar siempre RUT de prueba, nunca datos reales.
 
 - Todo módulo sigue `docs/diseno/` (PDF oficiales + resumen en `README.md`). Ante dudas, manda el PDF.
 - Ícono: baldosa 48 × 48 con el degradado de una de las 5 familias (1 Atención y acceso, 2 Clínica, 3 Calidad y seguridad, 4 Operaciones y equipos, 5 Personas y gestión) y pictograma de línea de Lucide (máx. 3 elementos, sin texto).
-- Nombre: una o dos palabras, mayúscula solo inicial, sin "Fricke", "App", "Sistema" ni siglas.
+- **Nombre: «F+» y el nombre corto del módulo**, en una sola palabra y en minúsculas (ej.: `F+data`, `F+farmacia`); sin «fricke», «app» ni «sistema». Regla de la Unidad del 18 nov 2026: reemplaza la regla de nombre de los PDF de diseño. El archivo del ícono queda como `f-<nombre>` (ej.: `f-data.svg`). La revisión automática rechaza cualquier otro formato.
 - Interfaz dentro de la carcasa común (barra superior, riel lateral, dirección `/m/<modulo>/<pantalla>`), colores solo desde las variables de `base.css`, cuatro estados (cargando, vacío, error, sin permiso), WCAG 2.2 AA, probado a 360 y 1440 px en modo claro y oscuro.
 - **El logo de Fricke Store no se modifica nunca.**
 - Proponer antes de aplicar cambios de diseño que afecten a más de un módulo.
