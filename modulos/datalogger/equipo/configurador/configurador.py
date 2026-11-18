@@ -192,6 +192,19 @@ class Monitor:
     def reiniciar(self):
         self.comando("@REINICIAR")
 
+    def wifi(self) -> dict | None:
+        """Estado del WiFi (firmware 2.1 o posterior); None si el firmware no lo tiene."""
+        try:
+            return self._json(self.comando("@WIFI?", fin=("@WIFI ", "@ERROR"), espera=3.0)[-1])
+        except ErrorMonitor:
+            return None
+
+    def poner_wifi(self, red: str, clave: str, servidor: str):
+        self.comando(f"@WIFI_SET {red}|{clave}|{servidor}")
+
+    def borrar_wifi(self):
+        self.comando("@WIFI_BORRAR")
+
 
 def puertos() -> list[tuple[str, str]]:
     """(puerto, descripción); primero los de Espressif (ESP32-C6 por USB)."""
@@ -598,7 +611,7 @@ class Aplicacion(tk.Tk):
                                       ("pantalla", "Pantalla")]),
                   ("Funcionamiento", [("hora", "Hora del monitor"), ("sd", "Tarjeta SD"),
                                       ("energia", "Respaldo de energía"), ("sensores", "Sensores emparejados"),
-                                      ("emparejando", "Emparejamiento")])]
+                                      ("emparejando", "Emparejamiento"), ("wifi", "WiFi")])]
         for col, (titulo, filas) in enumerate(grupos):
             marco, cuerpo = self._tarjeta(c, titulo)
             marco.grid(row=0, column=col, sticky="nsew", padx=(0, px(E3)) if col == 0 else 0)
@@ -648,6 +661,28 @@ class Aplicacion(tk.Tk):
 
         self._nota(c, "Si cambia el modelo de pantalla, el monitor se reinicia. Después conviene pulsar el botón de "
                       "cada sensor para que se reconecten de inmediato.", "aviso").pack(fill="x", pady=(px(E3), 0))
+
+        marco, cuerpo = self._tarjeta(c, "WiFi (envío de lecturas)",
+                                      "Opcional, firmware 2.1 o posterior. Cada minuto el monitor envía sus lecturas "
+                                      "al servidor. Sin WiFi el monitor funciona igual (pantalla, alarmas y SD).")
+        marco.pack(fill="x", pady=(px(E3), 0))
+        self.wifi_estado = None
+        self.var_wifi_red = tk.StringVar()
+        self.var_wifi_clave = tk.StringVar()
+        self.var_wifi_servidor = tk.StringVar()
+        self._fila_form(cuerpo, 0, "Red (nombre)", ttk.Entry(cuerpo, textvariable=self.var_wifi_red, width=28))
+        self._fila_form(cuerpo, 1, "Clave", ttk.Entry(cuerpo, textvariable=self.var_wifi_clave, width=28, show="•"),
+                        "En blanco: se conserva la guardada.")
+        self._fila_form(cuerpo, 2, "Servidor", ttk.Entry(cuerpo, textvariable=self.var_wifi_servidor, width=44),
+                        "Por ejemplo http://192.168.0.3:8080/monitor")
+        self.lbl_wifi = ttk.Label(cuerpo, text="—", style="Tarjeta.Tenue.TLabel", justify="left")
+        self.lbl_wifi.grid(row=3, column=1, sticky="ew", pady=(px(E1), 0))
+        cuerpo.columnconfigure(1, weight=1)
+        self._ajustable(self.lbl_wifi)
+        bf = ttk.Frame(cuerpo, style="Tarjeta.TFrame")
+        bf.grid(row=4, column=1, sticky="w", pady=(px(E2), 0))
+        self._boton(bf, "Guardar WiFi", self._guardar_wifi, "Primario.TButton")
+        self._boton(bf, "Desactivar WiFi", self._borrar_wifi, "Peligro.TButton")
 
     def _pestana_sensores(self):
         c, acc = self._pagina("Sensores", "Sensores",
@@ -795,13 +830,15 @@ class Aplicacion(tk.Tk):
             info = self.monitor.info()
             equipo, cfg = self.monitor.config()
             vivos = self.monitor.sensores()
-            return info, equipo, cfg, vivos
+            wifi = self.monitor.wifi()
+            return info, equipo, cfg, vivos, wifi
 
         self.trabajo(leer, self._mostrar_todo, "Leyendo el monitor")
 
     def _mostrar_todo(self, r):
-        info, self.cfg_equipo, self.cfg_sensores, self.vivos = r
+        info, self.cfg_equipo, self.cfg_sensores, self.vivos, wifi = r
         self._mostrar_info(info)
+        self._mostrar_wifi(wifi)
         self.var_codigo.set(self.cfg_equipo.get("codigo", ""))
         self.var_pantalla.set(self.cfg_equipo.get("pantalla", 1))
         self.var_buz_t.set(bool(self.cfg_equipo.get("buzzer_temp")))
@@ -839,6 +876,70 @@ class Aplicacion(tk.Tk):
             self._valor("emparejando", f"Red abierta {i['emparejando']} s más", "aviso")
         else:
             self._valor("emparejando", "Red cerrada", "tenue")
+
+    def _mostrar_wifi(self, w: dict | None):
+        self.wifi_estado = w
+        self.var_wifi_clave.set("")
+        if w is None:
+            self.var_wifi_red.set("")
+            self.var_wifi_servidor.set("")
+            self.lbl_wifi.config(text="Este firmware no tiene WiFi: instale la versión 2.1 o posterior (pestaña "
+                                      "Firmware).")
+            self._valor("wifi", "No disponible en este firmware", "tenue")
+            return
+        self.var_wifi_red.set(w.get("red", ""))
+        self.var_wifi_servidor.set(w.get("servidor", ""))
+        if not w.get("configurado"):
+            texto, tipo = "No configurado", "tenue"
+        elif w.get("conectado"):
+            texto = (f"Conectado a {w['red']} (IP {w['ip']}, señal {w['rssi']} dBm). Envíos correctos: "
+                     f"{w['envios_ok']}, con falla: {w['envios_falla']}")
+            tipo = "ok" if w.get("servidor") else "aviso"
+            if not w.get("servidor"):
+                texto += ". Falta el servidor: no se envía nada"
+        elif w.get("activo"):
+            texto, tipo = f"Sin conexión con {w['red']} (revise la red y la clave)", "alerta"
+        else:
+            texto, tipo = f"Apagado (memoria libre {w.get('memoria_libre', 0)} bytes; ver eventos)", "alerta"
+        self.lbl_wifi.config(text=texto)
+        self._valor("wifi", texto, tipo)
+
+    def _guardar_wifi(self):
+        if not self._requiere_conexion():
+            return
+        if self.wifi_estado is None:
+            messagebox.showwarning(TITULO, "Este firmware no tiene WiFi: instale la versión 2.1 o posterior.")
+            return
+        red = self.var_wifi_red.get().strip()
+        clave = self.var_wifi_clave.get()
+        servidor = self.var_wifi_servidor.get().strip()
+        if not red or len(red) > 32:
+            messagebox.showwarning(TITULO, "Escriba el nombre de la red (hasta 32 caracteres).")
+            return
+        if len(clave) > 63 or len(servidor) > 100 or "|" in red + clave + servidor:
+            messagebox.showwarning(TITULO, "La clave puede tener hasta 63 caracteres y el servidor hasta 100, "
+                                           "sin el carácter |.")
+            return
+        if servidor and not servidor.startswith(("http://", "https://")):
+            messagebox.showwarning(TITULO, "El servidor debe empezar con http:// (por ejemplo "
+                                           "http://192.168.0.3:8080/monitor).")
+            return
+        if not clave and red != self.wifi_estado.get("red"):
+            messagebox.showwarning(TITULO, "Escriba la clave de la red.")
+            return
+
+        def guardar():
+            self.monitor.poner_wifi(red, clave, servidor)
+            time.sleep(8)  # tiempo para que se conecte antes de volver a leer
+
+        self.trabajo(guardar, lambda _: self._leer_todo(), "Guardando el WiFi y conectando")
+
+    def _borrar_wifi(self):
+        if not self._requiere_conexion() or self.wifi_estado is None:
+            return
+        if not messagebox.askyesno(TITULO, "¿Desactivar el WiFi y borrar la red, la clave y el servidor guardados?"):
+            return
+        self.trabajo(self.monitor.borrar_wifi, lambda _: self._leer_todo(), "Desactivando el WiFi")
 
     def _llenar_tabla(self):
         self.tabla.delete(*self.tabla.get_children())
