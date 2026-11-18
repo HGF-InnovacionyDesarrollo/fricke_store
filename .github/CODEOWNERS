@@ -1,10 +1,10 @@
 # Dueños del código: GitHub pide la aprobación de estas cuentas para integrar cambios en lo que les pertenece
 # (activar "Require review from Code Owners" en la protección de main).
 # La base del sistema es de la Unidad de Innovación y Desarrollo.
-*                     @Rainiercastro @Frickeinnova
+*                     @Rainiercastro @HGF-InnovacionyDesarrollo
 # Los módulos los revisa la Unidad igual, pero sin exigir la aprobación de dueño del código.
 /modulos/
 /docs/logo/modulos/
 /frontend/img/modulos/
 # Estas reglas solo las cambia la Unidad.
-/.github/             @Rainiercastro @Frickeinnova
+/.github/             @Rainiercastro @HGF-InnovacionyDesarrollo
