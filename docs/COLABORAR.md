@@ -21,6 +21,9 @@ Instala:
   pide "haz un módulo de…"): Claude sigue paso a paso todas las directrices, corre las pruebas y prepara la entrega.
   Al abrir la carpeta del proyecto, Claude lee solo el archivo `CLAUDE.md` con todas las reglas: no necesitas
   copiarle instrucciones.
+- Si usas **Antigravity** u otro editor con agente: el agente lee solo `AGENTS.md` (las mismas reglas) y tiene la
+  habilidad `nuevo-modulo` en `.agents/skills/`. Si no la usa por su cuenta, pídele "sigue la guía nuevo-modulo".
+  También puedes abrir Claude Code en la terminal del editor (`claude`) y trabajar igual que arriba.
 
 Luego, en una terminal:
 
