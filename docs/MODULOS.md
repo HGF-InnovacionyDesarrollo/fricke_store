@@ -86,6 +86,12 @@ MANIFIESTO = Manifiesto(
   permisos de un módulo si su función lo requiere.
 - La API vive en `/api/m/<clave>/…` y la página en `/m/<clave>/`. Así hereda la protección CSRF, las cabeceras
   de seguridad y `Cache-Control: no-store` del portal.
+- **Aparatos sin persona** (por ejemplo un Monitor T/H con WiFi): el endpoint va bajo `/api/m/<clave>/equipo` y usa
+  `Depends(acceso_equipo("<clave>"))`. Se identifican con una **credencial de equipo** (un módulo, un equipo, se guarda
+  solo su huella SHA-256, se puede anular): `crear_credencial_equipo`, `credenciales_equipo`, `revocar_credencial_equipo`.
+  Solo esas rutas aceptan escrituras sin la cabecera anti-CSRF, y solo si la petición no trae cookie de sesión. El
+  aparato envía la credencial en `Authorization` (Basic, con la credencial como contraseña, o Bearer). Un endpoint de
+  equipo no puede ser el único registro de algo oficial ni escribir en la bitácora a nombre de una persona.
 - Si un módulo tiene que correr fuera del portal (otro lenguaje, otro servidor), se conversa antes: se expondrá
   un endpoint de verificación de sesión en vez de duplicar el login.
 

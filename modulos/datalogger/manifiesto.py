@@ -12,7 +12,7 @@ MANIFIESTO = Manifiesto(
     clave=CLAVE,
     nombre="F+data",
     descripcion="Temperatura y humedad de los data logger del hospital: valores, alarmas, revisiones e informes.",
-    version="0.2.2",
+    version="0.3.0",
     responsable="Unidad de Innovación y Desarrollo",
     familia=4,  # Operaciones y equipos (docs/diseno/, Parte 2)
     orden=200,
@@ -32,7 +32,7 @@ MANIFIESTO = Manifiesto(
         f"{CLAVE}.importar": "Importar los archivos de la tarjeta SD de los equipos",
         f"{CLAVE}.revisar": "Registrar la revisión de una alarma y la acción tomada",
         f"{CLAVE}.configurar": "Cambiar la ubicación de los sensores y dejarlos fuera de servicio",
-        f"{CLAVE}.equipos": "Configurar los equipos conectados por USB (hora, sensores, calibración, WiFi y clave)",
+        f"{CLAVE}.equipos": "Configurar los equipos por USB (hora, sensores, calibración, WiFi y clave) y su envío por WiFi",
     },
     permisos_por_perfil={
         "funcionario": (f"{CLAVE}.ver",),
@@ -44,5 +44,7 @@ MANIFIESTO = Manifiesto(
         f"{CLAVE}_sensor_actualizado": "Sensor actualizado (F+data)",
         f"{CLAVE}_lecturas_exportadas": "Mediciones descargadas (F+data)",
         f"{CLAVE}_equipo_configurado": "Equipo configurado por USB (F+data)",
+        f"{CLAVE}_envio_wifi_habilitado": "Envío por WiFi habilitado para un equipo (F+data)",
+        f"{CLAVE}_envio_wifi_anulado": "Envío por WiFi anulado para un equipo (F+data)",
     },
 )

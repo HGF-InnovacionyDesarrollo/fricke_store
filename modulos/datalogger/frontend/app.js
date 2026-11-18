@@ -24,6 +24,7 @@ Object.assign(LINEAS, {
   usb: '<circle cx="10" cy="7" r="1"/><circle cx="4" cy="20" r="1"/><path d="M4.7 19.3 19 5"/><path d="m21 3-3 1 2 2Z"/><path d="M9.26 7.68 5 12l2 5"/><path d="m10 14 5 2 3.5-3.5"/><path d="m18 12 1-1 1 1-1 1Z"/>',
   "refresh-cw": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
   "key-round": '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5"/>',
+  "wifi-off": '<path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="m2 2 20 20"/>',
   wifi: '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
   trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
   pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
@@ -103,9 +104,11 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     if (!d) return;
     const ult = d.ultima_importacion;
     const atrasada = !ult || Date.now() - new Date(ult.hasta) > 864e5;
-    let html = `<p class="aviso-suave aviso-datos">${linea(atrasada ? "clock" : "info")}<span>${ult
-      ? `Los datos llegan cuando se importa la tarjeta SD de cada equipo. Última importación: ${esc(fechaLocal(ult.creado_en))}, con datos hasta el ${esc(fechaLocal(ult.hasta))}.${atrasada ? " <b>Puede haber mediciones más recientes en los equipos.</b>" : ""}`
-      : "Aún no se importan datos. Los datos llegan cuando se importa la tarjeta SD de cada equipo."}</span></p>`;
+    const conWifi = d.equipos.some((e) => e.wifi);
+    const textoWifi = conWifi ? "Los equipos con WiFi envían su último valor cada minuto (en vivo); el registro oficial, con firmas, sigue siendo el de la tarjeta SD. " : "";
+    let html = `<p class="aviso-suave aviso-datos">${linea(atrasada && !conWifi ? "clock" : "info")}<span>${textoWifi}${ult
+      ? `Última importación de la SD: ${esc(fechaLocal(ult.creado_en))}, con datos hasta el ${esc(fechaLocal(ult.hasta))}.${atrasada && !conWifi ? " <b>Puede haber mediciones más recientes en los equipos.</b>" : ""}`
+      : conWifi ? "Aún no se importa la tarjeta SD." : "Aún no se importan datos. Los datos llegan cuando se importa la tarjeta SD de cada equipo o, si tienen WiFi, cada minuto."}</span></p>`;
     if (d.alarmas_pendientes) {
       html += `<button class="tarjeta aviso-alarmas" id="ir-alarmas">${linea("bell")}<span><b>${d.alarmas_pendientes} ${d.alarmas_pendientes === 1 ? "alarma" : "alarmas"} sin revisar</b><br>Revisa qué pasó y registra la acción tomada.</span></button>`;
     }
@@ -118,12 +121,20 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
       else estadoVacio(v, "Aún no hay sensores", "Aparecerán aquí al importar los archivos de la tarjeta SD de un equipo.",
         modulo.puede(`${CLAVE}.importar`) ? { texto: "Importar archivos", alHacer: importarArchivos } : null);
     } else {
-      html += equipos.map((e) => `<section class="grupo-equipo"><h2 class="titulo-seccion">Equipo ${esc(e.codigo)}</h2>
+      html += equipos.map((e) => `<section class="grupo-equipo"><h2 class="titulo-seccion cab-equipo">Equipo ${esc(e.codigo)}${chipWifi(e.wifi)}</h2>
         <div class="grilla-sensores">${e.sensores.map(tarjetaSensor).join("")}</div></section>`).join("");
       zona.innerHTML = html;
     }
     document.getElementById("ir-alarmas")?.addEventListener("click", () => ir("alarmas"));
     zona.querySelectorAll("[data-sensor]").forEach((b) => b.onclick = () => ir(`resumen/${b.dataset.sensor}`));
+  }
+
+  /** Estado del envío por WiFi de un equipo: con ícono y palabra, no solo color. */
+  function chipWifi(w) {
+    if (!w) return "";
+    return w.conectado
+      ? `<span class="chip-estado normal" title="Último envío: ${esc(fechaLocal(w.ultimo_envio))}">${linea("wifi")}En vivo</span>`
+      : `<span class="chip-estado atencion" title="Último envío: ${esc(fechaLocal(w.ultimo_envio))}">${linea("wifi-off")}Sin conexión desde ${esc(fechaLocal(w.ultimo_envio))}</span>`;
   }
 
   function tarjetaSensor(s) {
@@ -138,7 +149,7 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         <span class="valor ${esc(s.estado_h)}">${linea("droplet")}<b>${num(s.humedad, 0)}</b> %</span>
       </div>
       ${avisos.map((a) => `<div class="sensor-aviso">${a}</div>`).join("")}
-      <div class="sensor-pie">${s.fecha ? `Último dato: ${esc(fechaLocal(s.fecha))}` : "Sin mediciones"}</div>
+      <div class="sensor-pie">${s.fecha ? `Último dato: ${esc(fechaLocal(s.fecha))}${s.origen === "wifi" ? " · por WiFi" : ""}` : "Sin mediciones"}</div>
     </button>`;
   }
 
@@ -169,7 +180,7 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     document.getElementById("titulo-sensor").textContent = s.nombre;
     document.title = `${s.nombre} · F+data`;
     const sub = [s.ubicacion, `Equipo ${s.equipo}`, p ? `${p.nombre} (${p.referencia})` : "Sin tipo de almacenamiento"].filter(Boolean).join(" · ");
-    if (!d.lecturas.length) {
+    if (!d.lecturas.length && !d.en_vivo.length) {
       zona.innerHTML = `<p class="sensor-sub">${esc(sub)}</p><div id="vacio"></div>`;
       return estadoVacio(document.getElementById("vacio"), "Sin mediciones en este período", "Elige otro período o importa los archivos de la tarjeta SD de este equipo.");
     }
@@ -179,15 +190,16 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         <a class="btn btn-borde" href="${API}/sensores/${sid}/csv?${q}" download>${linea("download")}Descargar mediciones</a>
         <button class="btn btn-borde" id="imprimir">${linea("printer")}Imprimir informe</button>
       </div>
-      <div class="grilla-estad">
+      ${d.lecturas.length ? `<div class="grilla-estad">
         ${estad("Temperatura mínima", `${num(T.min)} °C`)}${estad("Temperatura máxima", `${num(T.max)} °C`)}
         ${estad("Promedio", `${num(T.promedio)} °C`)}${estad("Temperatura cinética media", `${num(T.mkt)} °C`, "Resume el efecto del calor en el período (USP 1079.2).")}
         ${estad("Tiempo sin alarma de temperatura", T.en_rango === null ? "—" : `${num(T.en_rango)} %`)}
         ${estad("Humedad mín. / máx.", `${num(H.min, 0)} / ${num(H.max, 0)} %`)}
         ${estad("Registro completo", d.cobertura === null ? "—" : `${num(d.cobertura)} %`, d.huecos.length ? `${d.huecos.length} ${d.huecos.length === 1 ? "hueco" : "huecos"} de más de 15 min` : "Sin huecos de más de 15 min")}
-      </div>
+      </div>` : `<p class="sensor-sub">Aún no hay datos de la tarjeta SD en este período: las estadísticas se calculan con el registro oficial.</p>`}
       <section class="tarjeta bloque-grafico"><h2 class="titulo-seccion">Temperatura (°C)</h2>${grafico(d, "temperatura", "t")}</section>
-      ${H.n ? `<section class="tarjeta bloque-grafico"><h2 class="titulo-seccion">Humedad relativa (%)</h2>${grafico(d, "humedad", "h")}</section>` : ""}
+      ${d.en_vivo.length ? `<p class="aviso-suave">${linea("wifi")}<span>La línea punteada es lo recibido por WiFi después del último dato de la tarjeta SD. No entra en las estadísticas: cuando importes la SD, se reemplaza por el registro oficial.</span></p>` : ""}
+      ${H.n || d.en_vivo.some((l) => l.humedad !== null) ? `<section class="tarjeta bloque-grafico"><h2 class="titulo-seccion">Humedad relativa (%)</h2>${grafico(d, "humedad", "h")}</section>` : ""}
       <section class="bloque-excursiones"><h2 class="titulo-seccion">Alarmas del período</h2>
         ${d.excursiones.length ? `<div class="lista">${d.excursiones.map(tarjetaAlarma).join("")}</div>` : `<p class="sensor-sub">No hubo valores fuera del rango de alarma.</p>`}</section>
       <p class="pie-informe">Informe generado el ${esc(fechaLocal(new Date().toISOString()))} desde F+data. Valores con la corrección de calibración ya aplicada.</p>`;
@@ -199,7 +211,9 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
 
   /** Gráfico de línea en SVG: banda verde del rango normal, líneas de alarma y cortes donde faltan datos. */
   function grafico(d, campo, v) {
-    const puntos = d.lecturas.filter((l) => l[campo] !== null).map((l) => ({ t: new Date(l.fecha).getTime(), y: l[campo] }));
+    const aPuntos = (filas) => filas.filter((l) => l[campo] !== null).map((l) => ({ t: new Date(l.fecha).getTime(), y: l[campo] }));
+    const oficiales = aPuntos(d.lecturas), vivos = aPuntos(d.en_vivo || []);
+    const puntos = oficiales.concat(vivos);
     const p = d.perfil || {};
     const limites = [p[`${v}_alarma_min`], p[`${v}_alarma_max`], p[`${v}_verde_min`], p[`${v}_verde_max`]].filter((x) => x !== null && x !== undefined);
     const ys = puntos.map((q) => q.y).concat(limites);
@@ -211,12 +225,21 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     const marcas = W < 600 ? 3 : 5;
     const x = (t) => L + (W - L - R) * (t - t0) / Math.max(1, t1 - t0);
     const y = (val) => A + (H - A - B) * (1 - (val - ymin) / (ymax - ymin));
-    let tramos = [], actual = [];
-    puntos.forEach((q, i) => {
-      if (i && q.t - puntos[i - 1].t > 15 * 60000) { tramos.push(actual); actual = []; }
-      actual.push(`${x(q.t).toFixed(1)},${y(q.y).toFixed(1)}`);
-    });
-    tramos.push(actual);
+    // Tramos sin cortes de más de 15 min (la SD graba cada 5 min). Lo de WiFi llega cuando el sensor reporta
+    // (10 a 60 min), así que ahí el corte es de 75 min, como el aviso de "sin reportar".
+    const enTramos = (pts, corte) => {
+      const tramos = [];
+      let actual = [];
+      pts.forEach((q, i) => {
+        if (i && q.t - pts[i - 1].t > corte * 60000) { tramos.push(actual); actual = []; }
+        actual.push(`${x(q.t).toFixed(1)},${y(q.y).toFixed(1)}`);
+      });
+      tramos.push(actual);
+      return tramos.filter((t) => t.length);
+    };
+    const dibujar = (tramos, clase) => tramos.map((t) => t.length === 1
+      ? `<circle class="${clase}" cx="${t[0].split(",")[0]}" cy="${t[0].split(",")[1]}" r="2"/>`
+      : `<polyline class="${clase}" points="${t.join(" ")}"/>`).join("");
     const vmin = p[`${v}_verde_min`] ?? ymin, vmax = p[`${v}_verde_max`] ?? ymax;
     const banda = limites.length ? `<rect class="banda-ok" x="${L}" width="${W - L - R}" y="${y(Math.min(vmax, ymax)).toFixed(1)}" height="${(y(Math.max(vmin, ymin)) - y(Math.min(vmax, ymax))).toFixed(1)}"/>` : "";
     const alarmas = [p[`${v}_alarma_min`], p[`${v}_alarma_max`]].filter((a) => a !== null && a !== undefined)
@@ -232,8 +255,8 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     }).join("");
     const resumen = `${campo === "temperatura" ? "Temperatura" : "Humedad"} entre ${num(Math.min(...puntos.map((q) => q.y)), 1)} y ${num(Math.max(...puntos.map((q) => q.y)), 1)}`;
     return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(resumen)}">${banda}${ejeY}${alarmas}
-      ${tramos.filter((t) => t.length).map((t) => t.length === 1 ? `<circle class="serie" cx="${t[0].split(",")[0]}" cy="${t[0].split(",")[1]}" r="2"/>` : `<polyline class="serie" points="${t.join(" ")}"/>`).join("")}${ejeX}</svg>
-      <div class="leyenda"><span><i class="m-serie"></i>Medición</span>${limites.length ? `<span><i class="m-banda"></i>Rango normal</span><span><i class="m-alarma"></i>Límite de alarma</span>` : ""}</div>`;
+      ${dibujar(enTramos(oficiales, 15), "serie")}${dibujar(enTramos(vivos, 75), "serie en-vivo")}${ejeX}</svg>
+      <div class="leyenda">${oficiales.length ? `<span><i class="m-serie"></i>Medición (SD)</span>` : ""}${vivos.length ? `<span><i class="m-vivo"></i>En vivo (WiFi)</span>` : ""}${limites.length ? `<span><i class="m-banda"></i>Rango normal</span><span><i class="m-alarma"></i>Límite de alarma</span>` : ""}</div>`;
   }
 
   // ---------------------------------------------------------------- alarmas
@@ -313,20 +336,22 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         ${editar ? `<td><button class="btn-icono" data-editar="${s.id}" aria-label="Editar ${esc(s.nombre)}" title="Editar sensor">${linea("pencil")}</button></td>` : ""}</tr>`).join("")}</tbody></table></div>
     </section>`).join("");
     const todos = d.equipos.flatMap((e) => e.sensores);
-    zona.querySelectorAll("[data-editar]").forEach((b) => b.onclick = () => editarSensor(todos.find((s) => s.id === Number(b.dataset.editar))));
+    zona.querySelectorAll("[data-editar]").forEach((b) => b.onclick = () => editarSensor(todos.find((s) => s.id === Number(b.dataset.editar)), d.perfiles));
   }
 
-  function editarSensor(s) {
+  function editarSensor(s, perfiles) {
     dialogo({
       titulo: `Editar ${s.nombre}`,
-      html: `<p class="dlg-texto">El nombre y el tipo de almacenamiento se cambian en el equipo, con el Configurador.</p>
+      html: `<p class="dlg-texto">El nombre se cambia en el equipo, con el Configurador. El tipo de almacenamiento lo traen los archivos de la tarjeta SD; aquí puedes fijarlo para los equipos que envían solo por WiFi.</p>
+        <div class="campo"><select id="es-perfil"><option value="">Sin tipo</option>${perfiles.map((p) => `<option value="${p.id}" ${p.id === s.perfil_id ? "selected" : ""}>${esc(p.nombre)} (${esc(p.referencia)})</option>`).join("")}</select><label for="es-perfil">Tipo de almacenamiento</label></div>
         <div class="campo"><input id="es-ubic" placeholder=" " maxlength="80" value="${esc(s.ubicacion)}"><label for="es-ubic">Ubicación</label>
           <div class="ayuda">Por ejemplo: Farmacia central, bodega 2.</div></div>
         <label class="casilla"><input type="checkbox" id="es-fuera" ${s.activo ? "" : "checked"}> Fuera de servicio (no aparece en el resumen ni en las alarmas)</label>
         <div class="zona-error"></div>`,
       acciones: [{ texto: "Cancelar", clase: "btn btn-texto", valor: null }, { texto: "Guardar cambios", alHacer: async (v) => {
         try {
-          await api(`${API}/sensores/${s.id}`, { metodo: "PUT", datos: { ubicacion: v.querySelector("#es-ubic").value, activo: !v.querySelector("#es-fuera").checked } });
+          await api(`${API}/sensores/${s.id}`, { metodo: "PUT", datos: { ubicacion: v.querySelector("#es-ubic").value, activo: !v.querySelector("#es-fuera").checked,
+            perfil_id: v.querySelector("#es-perfil").value ? Number(v.querySelector("#es-perfil").value) : null } });
         } catch (e) { mostrarErrorEn(v.querySelector(".zona-error"), e.message); return false; }
         toast("Cambios guardados."); pintarSensores(); return true;
       } }],
@@ -509,8 +534,9 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
           <div class="sensor-sub" id="usb-estado" role="status">${i ? `Serie ${esc(i.serie)} · Firmware ${esc(i.firmware)}`
             : "Conecta el monitor al PC con el cable USB y pulsa «Conectar monitor». Elige el puerto que dice «USB JTAG/serial debug unit»."}</div></div>
           <button class="btn ${i ? "btn-borde" : ""}" id="usb-conectar">${linea("usb")}${i ? "Desconectar" : "Conectar monitor"}</button></div>
-      </section><div id="usb-cuerpo"></div>`;
+      </section><div id="usb-cuerpo"></div><section class="tarjeta bloque-usb" id="envio-wifi" aria-live="polite"></section>`;
     document.getElementById("usb-conectar").onclick = conectar;
+    pintarEnvioWifi(document.getElementById("envio-wifi"));
     const cuerpo = document.getElementById("usb-cuerpo");
     if (!i) {
       cuerpo.innerHTML = `<p class="aviso-suave">${linea("info")}<span>Desde aquí se hace lo mismo que con el Configurador de Windows: hora, sensores, calibración, alarmas, WiFi, eventos, respaldo y clave de firma.
@@ -525,7 +551,36 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     ({ equipo: seccionEquipo, config: seccionConfig, sensores: seccionSensoresUSB, registro: seccionRegistro }[seccionUSB])(sec);
   }
 
+  /** Equipos habilitados para enviar por WiFi a F+data, con su último envío y la opción de anular la credencial. */
+  async function pintarEnvioWifi(cont) {
+    const titulo = `<h2 class="titulo-seccion">Equipos que envían por WiFi a F+data</h2>`;
+    cont.innerHTML = titulo + `<div id="ew-zona"></div>`;
+    const zona = document.getElementById("ew-zona");
+    const d = await cargar(zona, `${API}/envio-wifi`, "los equipos con WiFi", () => pintarEnvioWifi(cont));
+    if (!d) return;
+    if (!d.equipos.length) {
+      zona.innerHTML = `<p class="sensor-sub">Ningún equipo está habilitado. Conecta un monitor con firmware 2.1 y, en Configuración › WiFi, pulsa «Usar F+data como servidor».</p>`;
+      return;
+    }
+    zona.innerHTML = `<div class="tabla-envoltura"><table class="tabla"><thead><tr><th>Equipo</th><th>Último envío</th><th>Señal</th><th>Habilitado</th><th><span class="sr">Acciones</span></th></tr></thead><tbody>
+      ${d.equipos.map((e) => `<tr><td>${esc(e.equipo)}</td>
+        <td>${e.wifi_ultimo_envio ? esc(fechaLocal(e.wifi_ultimo_envio)) : "Aún no envía"}</td>
+        <td class="nowrap">${e.wifi_rssi === null || e.wifi_rssi === undefined ? "—" : `${esc(e.wifi_rssi)} dBm`}</td>
+        <td>${esc(fechaLocal(e.creada_en))}<br><small>${esc(e.creada_por)}</small></td>
+        <td><button class="btn btn-texto" data-anular="${e.id}" data-equipo="${esc(e.equipo)}">Anular</button></td></tr>`).join("")}
+      </tbody></table></div>`;
+    zona.querySelectorAll("[data-anular]").forEach((b) => b.onclick = async () => {
+      if (!await confirmarDestructivo({ titulo: `¿Anular el envío de ${b.dataset.equipo}?`, texto: "El equipo deja de poder enviar datos a F+data hasta que lo vuelvas a habilitar. La tarjeta SD sigue grabando igual.", verbo: "Anular" })) return;
+      try { await api(`${API}/envio-wifi/${b.dataset.anular}`, { metodo: "DELETE" }); toast("Envío por WiFi anulado."); }
+      catch (_) { toast("No pudimos anularlo. Intenta de nuevo."); }
+      pintarEnvioWifi(cont);
+    });
+  }
+
   const fila = (etq, valor, tono = "") => `<dt>${esc(etq)}</dt><dd class="${tono ? `tono-${tono}` : ""}">${tono === "alerta" ? linea("triangle-alert") : ""}${esc(valor)}</dd>`;
+
+  /** La dirección del servidor sin la credencial (http://equipo:•••@host/...). */
+  const ocultarClave = (url) => String(url || "").replace(/\/\/([^/@:]+):[^/@]*@/, "//$1:•••@");
 
   function textoWifi(w) {
     if (w === null) return ["Este firmware no tiene WiFi (desde la versión 2.1).", ""];
@@ -590,13 +645,14 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         <div class="zona-error"></div><div class="pie-form"><button class="btn">Guardar en el monitor</button></div></form>
       <form class="tarjeta form-usb" id="f-wifi"><h2 class="titulo-seccion">WiFi (envío de lecturas)</h2>
         <p class="sensor-sub">Opcional, firmware 2.1 o posterior. Cada minuto el monitor envía sus lecturas al servidor. Sin WiFi funciona igual (pantalla, alarmas y SD).
-          F+data todavía no recibe esos envíos: falta la credencial de equipo que debe preparar la Unidad de Innovación y Desarrollo.</p>
+          Para que lleguen a F+data, pulsa «Usar F+data como servidor» y luego «Guardar WiFi».</p>
         <p class="estado-wifi ${tonoWifi ? `tono-${tonoWifi}` : ""}">${esc(estadoWifi)}</p>
         ${wifi === null ? "" : `<div class="campo"><input id="u-red" placeholder=" " maxlength="32" value="${esc(wifi.red || "")}" autocomplete="off"><label for="u-red">Red (nombre)</label></div>
         <div class="campo"><input id="u-clave" type="password" placeholder=" " maxlength="63" autocomplete="new-password"><label for="u-clave">Clave de la red</label>
           <div class="ayuda">En blanco se conserva la guardada.</div></div>
-        <div class="campo"><input id="u-servidor" placeholder=" " maxlength="100" value="${esc(wifi.servidor || "")}" autocomplete="off" spellcheck="false"><label for="u-servidor">Servidor</label>
-          <div class="ayuda">Por ejemplo http://192.168.0.3:8080/monitor</div></div>
+        <div class="campo"><input id="u-servidor" placeholder=" " maxlength="100" value="${esc(ocultarClave(wifi.servidor))}" autocomplete="off" spellcheck="false"><label for="u-servidor">Servidor</label>
+          <div class="ayuda">La dirección de F+data lleva la credencial del equipo (se muestra como •••).</div></div>
+        <div class="acciones-informe"><button type="button" class="btn btn-borde" id="u-wifi-fdata">${linea("key-round")}Usar F+data como servidor</button></div>
         <div class="zona-error"></div><div class="pie-form"><button type="button" class="btn btn-texto" id="u-wifi-borrar">Desactivar WiFi</button><button class="btn">Guardar WiFi</button></div>`}</form>`;
 
     const fe = document.getElementById("f-equipo");
@@ -623,7 +679,9 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
     fw.onsubmit = async (ev) => {
       ev.preventDefault();
       const zonaError = fw.querySelector(".zona-error");
-      const red = fw.querySelector("#u-red").value.trim(), clave = fw.querySelector("#u-clave").value, servidor = fw.querySelector("#u-servidor").value.trim();
+      const red = fw.querySelector("#u-red").value.trim(), clave = fw.querySelector("#u-clave").value;
+      let servidor = fw.querySelector("#u-servidor").value.trim();
+      if (servidor === ocultarClave(wifi.servidor)) servidor = wifi.servidor || "";  // sin cambios: la guardada
       const error = !red ? "Escribe el nombre de la red."
         : (red + clave + servidor).includes("|") ? "La red, la clave y el servidor no pueden tener el carácter |."
         : servidor && !/^https?:\/\//.test(servidor) ? "El servidor debe empezar con http:// o https:// (por ejemplo http://192.168.0.3:8080/monitor)."
@@ -635,6 +693,29 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         await registrar("wifi");
         await new Promise((r) => setTimeout(r, 8000));   // tiempo para que se conecte antes de volver a leer
       });
+    };
+    document.getElementById("u-wifi-fdata").onclick = async () => {
+      const zonaError = fw.querySelector(".zona-error");
+      const codigo = String(equipoUSB.info.codigo || "");
+      if (!/^[A-Za-z0-9_-]{2,16}$/.test(codigo)) return mostrarErrorEn(zonaError, "Primero ponle al equipo un código con letras, números y guion (por ejemplo MTH-03) en «Equipo».");
+      const ok = await dialogo({ titulo: `¿Habilitar el envío por WiFi de ${codigo}?`,
+        html: `<p class="dlg-texto">F+data crea una credencial para este equipo y arma la dirección del servidor. Si el equipo ya tenía una, la anterior deja de servir.</p>
+          <p class="dlg-texto">El PC o servidor donde corre Fricke Store debe estar encendido y en la misma red que el monitor.</p>`,
+        acciones: [{ texto: "Cancelar", clase: "btn btn-texto", valor: false }, { texto: "Habilitar", clase: "btn", valor: true }] });
+      if (!ok) return;
+      try {
+        const info = await api(`${API}/envio-wifi`);
+        const local = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
+        const host = local ? info.ips[0] : location.hostname;
+        if (!host) return mostrarErrorEn(zonaError, "No encontramos la dirección de este PC en la red. Conéctalo a la red del hospital y vuelve a intentarlo.");
+        const puerto = location.port || String(info.puerto);
+        const r = await api(`${API}/envio-wifi`, { metodo: "POST", datos: { equipo: codigo } });
+        const url = `${location.protocol}//equipo:${r.secreto}@${host}${puerto && !["80", "443"].includes(puerto) ? `:${puerto}` : ""}${r.ruta}`;
+        if (url.length > 100) return mostrarErrorEn(zonaError, "La dirección queda muy larga para el monitor (máximo 100 caracteres). Pide a la Unidad un nombre de servidor más corto.");
+        fw.querySelector("#u-servidor").value = url;
+        mostrarErrorEn(zonaError, "");
+        toast("Dirección lista. Revisa la red y su clave y pulsa «Guardar WiFi» para ponerla en el monitor.", 8000);
+      } catch (e) { mostrarErrorEn(zonaError, e.message || "No pudimos habilitar el envío. Intenta de nuevo."); }
     };
     document.getElementById("u-wifi-borrar").onclick = async () => {
       if (!await confirmarDestructivo({ titulo: "¿Desactivar el WiFi?", texto: "Se borran la red, la clave y el servidor guardados en el monitor.", verbo: "Desactivar WiFi" })) return;

@@ -24,7 +24,16 @@ alarma bajo 18 o sobre 24 °C, humedad normal 33 a 47 %, alarma bajo 30 o sobre 
 
 ## Cómo llegan los datos
 
-Los Monitor T/H no tienen red. Se importan los CSV de las carpetas `datos/` y `eventos/` de la tarjeta SD
+**1. Por WiFi, en vivo (firmware 2.1).** Cada minuto el monitor envía a `/api/m/datalogger/equipo` el último valor de
+cada sensor. No usa sesión de persona: cada equipo tiene su **credencial de equipo** (plataforma, `acceso_equipo`):
+sirve para un solo módulo y un solo equipo, se guarda solo como huella SHA-256 y se puede anular. Se crea en
+*Configurador › Configuración › WiFi › Usar F+data como servidor*, que arma la dirección
+`http://equipo:<credencial>@<este PC>:8090/api/m/datalogger/equipo` para ponerla en el monitor (máx. 100 caracteres).
+Lo recibido se guarda aparte (`lecturas_wifi`) y se ve en el Resumen con el aviso «En vivo» y en el detalle como línea
+punteada. **No entra en estadísticas, MKT ni alarmas**: el registro oficial es el de la SD (tiene firmas). Si llega el
+mismo reporte en dos envíos seguidos, se guarda una vez. Sin envíos por 5 min, el equipo aparece «Sin conexión».
+
+**2. Desde la tarjeta SD (registro oficial).** Se importan los CSV de las carpetas `datos/` y `eventos/`
 (*Importar archivos*). El módulo:
 
 - reconoce los tres formatos del firmware (con y sin columna Monitor, y los antiguos separados por coma);
@@ -35,6 +44,10 @@ Los Monitor T/H no tienen red. Se importan los CSV de las carpetas `datos/` y `e
 
 Límite conocido: en la hora repetida del cambio a horario de invierno (primer sábado de abril), las mediciones de esa
 hora se toman como repetidas.
+
+**Seguridad del envío por WiFi:** el firmware envía por HTTP; úsalo solo dentro de la red interna del hospital. Con
+HTTPS en el portal (`ECO_TLS_CERT`) el monitor necesitaría confiar en el certificado, que aún no soporta. La
+credencial no da acceso a nada más que a enviar datos de ese equipo.
 
 ## Configurador de equipos (USB)
 
@@ -53,7 +66,6 @@ o `https`). La conexión la hace el navegador: el servidor no ve el puerto USB. 
 la bitácora (`datalogger_equipo_configurado`, sin la clave ni el contenido), y se actualizan la serie y el firmware
 del equipo si ya existe. **Instalar firmware sigue en el Configurador de Windows** (necesita esptool).
 
-El portal todavía no recibe los envíos por WiFi del firmware 2.1: falta la credencial de equipo (ver Pendiente).
 
 ## Código del equipo (`equipo/`)
 
@@ -88,8 +100,7 @@ de cada persona en *Mi cuenta › Descargar mis datos*.
 
 ## Pendiente (pedir a la Unidad de Innovación y Desarrollo)
 
-- **Envío automático desde los equipos** (etapa 3 del Monitor T/H, por WiFi o LoRaWAN): necesita una credencial de
-  equipo común en el portal, porque hoy todo endpoint exige la sesión de una persona.
+- Envío por **LoRaWAN** u otros canales (hoy solo WiFi). Alarmas por WiFi: se calculan solo con la SD.
 - **Avisos de alarma** por correo u otro canal: necesita el servicio común de avisos.
 - Aviso de calibración vencida (12 meses, APF 1.5) cuando los equipos informen la fecha de calibración en sus archivos.
 

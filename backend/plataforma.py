@@ -11,8 +11,11 @@ Las reglas completas están en docs/MODULOS.md.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib
 import re
+import secrets
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -363,6 +366,96 @@ def acceso(clave: str, permiso: str | None = None):
         if permiso and permiso not in permisos:
             raise HTTPException(403, "Tu perfil no tiene permiso para esta acción.")
         return ContextoModulo(base, clave, permisos)
+    return dep
+
+
+# ------------------------------------------------------------------ credenciales de equipo (aparatos sin persona)
+# Un aparato (p. ej. un Monitor T/H con WiFi) no tiene sesión: se identifica con una credencial propia, de un solo
+# módulo y un solo equipo, que viaja en la cabecera Authorization (Basic, con la credencial como contraseña, o
+# Bearer). El portal guarda solo su huella SHA-256. Las rutas de equipo van bajo /api/m/<clave>/equipo y son las
+# únicas que aceptan escrituras sin la cabecera anti-CSRF (no usan cookies: un formulario ajeno no puede usarlas).
+RUTA_EQUIPO = re.compile(r"^/api/m/[a-z0-9_]+/equipo(/|$)")
+_EQUIPO_VALIDO = re.compile(r"[A-Za-z0-9_-]{2,16}")
+_ALFABETO = "abcdefghijkmnpqrstuvwxyz23456789"  # sin 0/o ni 1/l: se puede dictar o copiar a mano
+
+
+def _huella(secreto: str) -> str:
+    return hashlib.sha256(secreto.encode()).hexdigest()
+
+
+def crear_credencial_equipo(clave: str, equipo: str, usuario_id: int | None) -> str:
+    """Crea una credencial para `equipo` en el módulo `clave` y devuelve el secreto (solo se muestra esta vez).
+    Las credenciales anteriores del mismo equipo quedan revocadas."""
+    if not _EQUIPO_VALIDO.fullmatch(equipo or ""):
+        raise ValueError("El código del equipo tiene de 2 a 16 letras, números, - o _.")
+    secreto = "".join(secrets.choice(_ALFABETO) for _ in range(24))  # ~120 bits
+    with bd() as c:
+        c.execute("UPDATE credenciales_equipo SET revocada_en=? WHERE modulo=? AND equipo=? AND revocada_en IS NULL",
+                  (ahora(), clave, equipo))
+        c.execute("INSERT INTO credenciales_equipo (modulo, equipo, huella, creada_por, creada_en) VALUES (?,?,?,?,?)",
+                  (clave, equipo, _huella(secreto), usuario_id, ahora()))
+    return secreto
+
+
+def credenciales_equipo(clave: str) -> list[dict]:
+    """Credenciales vigentes del módulo (sin la huella)."""
+    with bd() as c:
+        return [dict(f) for f in c.execute(
+            "SELECT id, equipo, creada_por, creada_en, ultimo_uso, ultima_ip FROM credenciales_equipo "
+            "WHERE modulo=? AND revocada_en IS NULL ORDER BY equipo", (clave,))]
+
+
+def revocar_credencial_equipo(clave: str, credencial_id: int) -> bool:
+    with bd() as c:
+        r = c.execute("UPDATE credenciales_equipo SET revocada_en=? WHERE id=? AND modulo=? AND revocada_en IS NULL "
+                      "RETURNING id", (ahora(), credencial_id, clave)).fetchone()
+    return r is not None
+
+
+def _secreto_de(request: Request) -> str | None:
+    cabecera = request.headers.get("authorization") or ""
+    tipo, _, valor = cabecera.partition(" ")
+    if tipo.lower() == "bearer":
+        return valor.strip() or None
+    if tipo.lower() == "basic":
+        try:
+            usuario_clave = base64.b64decode(valor.strip(), validate=True).decode()
+        except ValueError:
+            return None
+        return usuario_clave.partition(":")[2] or None
+    return None
+
+
+class ContextoEquipo:
+    """Lo que recibe un endpoint de equipo: qué equipo envía (según su credencial) y desde qué IP."""
+
+    def __init__(self, clave: str, credencial_id: int, equipo: str, ip: str):
+        self.clave, self.credencial_id, self.equipo, self.ip = clave, credencial_id, equipo, ip
+
+
+def acceso_equipo(clave: str):
+    """Dependencia FastAPI para los endpoints que llaman los aparatos (ruta bajo /api/m/<clave>/equipo):
+
+        @router.post("/equipo")
+        def recibir(d: Envio, eq: ContextoEquipo = Depends(acceso_equipo("ejemplo"))): ...
+
+    Sin credencial válida responde 401; con el módulo inactivo o suspendido, 403."""
+    def dep(request: Request) -> ContextoEquipo:
+        secreto = _secreto_de(request)
+        fila = None
+        if secreto and len(secreto) <= 100:
+            with bd() as c:
+                fila = c.execute("SELECT id, equipo FROM credenciales_equipo WHERE huella=? AND modulo=? "
+                                 "AND revocada_en IS NULL", (_huella(secreto), clave)).fetchone()
+        if not fila:
+            raise HTTPException(401, "Credencial de equipo no válida.")
+        with bd() as c:
+            activo = c.execute("SELECT activo FROM modulos WHERE clave=?", (clave,)).fetchone()
+            if not activo or not activo["activo"] or clave not in REGISTRO:
+                raise HTTPException(403, "El módulo no está activo.")
+            ip = request.client.host if request.client else ""
+            c.execute("UPDATE credenciales_equipo SET ultimo_uso=?, ultima_ip=? WHERE id=?", (ahora(), ip[:45], fila["id"]))
+        return ContextoEquipo(clave, fila["id"], fila["equipo"], ip)
     return dep
 
 
