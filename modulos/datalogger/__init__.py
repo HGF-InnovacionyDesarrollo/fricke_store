@@ -1,4 +1,4 @@
-"""Data+: recibe y muestra la información de los data logger del hospital (temperatura y humedad).
+"""F+data: recibe y muestra la información de los data logger del hospital (temperatura y humedad).
 
 Detalles en README.md. Reglas en docs/MODULOS.md.
 """

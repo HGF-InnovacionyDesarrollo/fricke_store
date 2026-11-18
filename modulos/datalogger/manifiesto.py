@@ -1,6 +1,6 @@
-"""Identidad, ficha de tratamiento (Ley 21.719) y permisos de Data+.
+"""Identidad, ficha de tratamiento (Ley 21.719) y permisos de F+data.
 
-Data+ recibe y muestra lo que registran los data logger del hospital (hoy, los Monitor T/H de temperatura y
+F+data recibe y muestra lo que registran los data logger del hospital (hoy, los Monitor T/H de temperatura y
 humedad). Los datos de las mediciones no son datos personales; lo único personal que guarda es qué funcionario
 importó cada archivo y quién revisó cada alarma, para la trazabilidad que piden las pautas de acreditación.
 """
@@ -10,7 +10,7 @@ CLAVE = "datalogger"
 
 MANIFIESTO = Manifiesto(
     clave=CLAVE,
-    nombre="Data+",
+    nombre="F+data",
     descripcion="Temperatura y humedad de los data logger del hospital: valores, alarmas, revisiones e informes.",
     version="0.1.0",
     responsable="Unidad de Innovación y Desarrollo",
@@ -38,9 +38,9 @@ MANIFIESTO = Manifiesto(
         "admin": (f"{CLAVE}.ver", f"{CLAVE}.importar", f"{CLAVE}.revisar", f"{CLAVE}.configurar"),
     },
     acciones={
-        f"{CLAVE}_importacion_realizada": "Archivos de data logger importados (Data+)",
-        f"{CLAVE}_alarma_revisada": "Revisión de alarma registrada (Data+)",
-        f"{CLAVE}_sensor_actualizado": "Sensor actualizado (Data+)",
-        f"{CLAVE}_lecturas_exportadas": "Mediciones descargadas (Data+)",
+        f"{CLAVE}_importacion_realizada": "Archivos de data logger importados (F+data)",
+        f"{CLAVE}_alarma_revisada": "Revisión de alarma registrada (F+data)",
+        f"{CLAVE}_sensor_actualizado": "Sensor actualizado (F+data)",
+        f"{CLAVE}_lecturas_exportadas": "Mediciones descargadas (F+data)",
     },
 )

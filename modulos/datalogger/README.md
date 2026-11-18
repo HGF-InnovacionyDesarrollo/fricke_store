@@ -1,4 +1,4 @@
-# Data+ (data logger)
+# F+data (data logger)
 
 Recibe y muestra la información de los data logger del hospital. Hoy son los **Monitor T/H** (temperatura y humedad
 con sensores Zigbee, proyecto `Monitor_TH` de la Unidad de Innovación y Desarrollo), que graban en su tarjeta SD.
@@ -66,5 +66,5 @@ de cada persona en *Mi cuenta › Descargar mis datos*.
 pytest modulos/datalogger
 ```
 
-Para verlo: *Administración › Módulos › Data+*, marcar *Activo* y elegir los perfiles. Luego importar los CSV de
+Para verlo: *Administración › Módulos › F+data*, marcar *Activo* y elegir los perfiles. Luego importar los CSV de
 `Monitor_TH/respaldo_sd/`.
