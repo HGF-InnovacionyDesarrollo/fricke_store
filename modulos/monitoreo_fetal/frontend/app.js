@@ -1,4 +1,4 @@
-// Módulo Monitoreo fetal — Simulador docente y evaluador determinístico MEFI v2.0
+// Módulo F+fetal — Simulador docente y evaluador determinístico MEFI v2.0
 // (Protocolo Institucional V2 sept. 2025, ACOG CPG No. 10 2025, FIGO 2015 y NICE NG229).
 // Sin datos de pacientes: uso exclusivo para entrenamiento y simulación de funcionarios clínicos.
 "use strict";
@@ -28,10 +28,10 @@ const ETIQUETA_HIPOXIA = {
 
   const inicio = await iniciarModulo(CLAVE, {
     destinos: [
-      { id: "todas", etiqueta: "Simulaciones de la unidad", icono: "list" },
-      { id: "mias", etiqueta: "Mis simulaciones", icono: "user", permiso: `${CLAVE}.simular` },
-      { id: "casos", etiqueta: "Casos docentes", icono: "inbox" },
-      { id: "acerca", etiqueta: "Acerca del módulo", icono: "info" },
+      { id: "todas", etiqueta: "Todas", icono: "list" },
+      { id: "mias", etiqueta: "Mías", icono: "user", permiso: `${CLAVE}.simular` },
+      { id: "casos", etiqueta: "Casos", icono: "inbox" },
+      { id: "acerca", etiqueta: "Acerca", icono: "info" },
     ],
     accion: { texto: "Nueva simulación", icono: "plus", permiso: `${CLAVE}.simular`, alHacer: () => nuevaSimulacion() },
     buscar: {

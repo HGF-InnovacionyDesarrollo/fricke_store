@@ -1,4 +1,4 @@
-/* Estilos del módulo Monitoreo fetal. Solo variables de base.css; prohibido usar colores fijos (#hex o rgb/rgba). */
+/* Estilos del módulo F+fetal. Solo variables de base.css; prohibido usar colores fijos (#hex o rgb/rgba). */
 .lista-simulaciones { display: grid; gap: 12px; max-width: 840px; }
 .grilla-casos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; max-width: 960px; margin-top: 16px; }
 .simulacion h2, .caso-docente h2 { font-size: 16px; line-height: 24px; font-weight: 500; margin: 0 0 8px; color: var(--texto); }

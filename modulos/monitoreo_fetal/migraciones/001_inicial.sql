@@ -1,4 +1,4 @@
--- Esquema inicial del módulo Monitoreo fetal (se crea dentro del esquema m_monitoreo_fetal, con el rol del módulo).
+-- Esquema inicial del módulo F+fetal (se crea dentro del esquema m_monitoreo_fetal, con el rol del módulo).
 -- Una migración aplicada NO se edita: los cambios van en 002_*.sql. Sin BEGIN/COMMIT: el portal ya usa una transacción.
 -- Las personas se referencian por usuarios.id del portal (nunca el RUT). Fechas en TIMESTAMPTZ.
 CREATE TABLE simulaciones (
@@ -15,7 +15,7 @@ CREATE TABLE simulaciones (
     tipo_desaceleracion TEXT NOT NULL CHECK (tipo_desaceleracion IN ('ninguna', 'precoz', 'variable', 'tardia', 'prolongada')),
     duracion_max_decel_s INTEGER NOT NULL CHECK (duracion_max_decel_s BETWEEN 0 AND 600),
     contracciones_10min NUMERIC(3,1) NOT NULL CHECK (contracciones_10min BETWEEN 0 AND 15),
-    patron_sinusoidal BOOLEAN NOT NULL DEFAULT FALSE,
+    patron_sinusoidal SMALLINT NOT NULL DEFAULT 0 CHECK (patron_sinusoidal IN (0, 1)),  -- 0/1: el portal guarda sí/no como número
     categoria_figo TEXT NOT NULL CHECK (categoria_figo IN ('I', 'II', 'III')),
     categoria_acog TEXT NOT NULL CHECK (categoria_acog IN ('I', 'II', 'III')),
     riesgo_cat_ii TEXT NOT NULL CHECK (riesgo_cat_ii IN ('no_aplica', 'con_rasgos_protectores', 'intermedio', 'alto')),
