@@ -1,4 +1,4 @@
--- Esquema inicial del módulo F+fetal (se crea dentro del esquema m_monitoreo_fetal, con el rol del módulo).
+-- Esquema inicial del módulo F+mefi (se crea dentro del esquema m_monitoreo_fetal, con el rol del módulo).
 -- Una migración aplicada NO se edita: los cambios van en 002_*.sql. Sin BEGIN/COMMIT: el portal ya usa una transacción.
 -- Las personas se referencian por usuarios.id del portal (nunca el RUT). Fechas en TIMESTAMPTZ.
 CREATE TABLE simulaciones (

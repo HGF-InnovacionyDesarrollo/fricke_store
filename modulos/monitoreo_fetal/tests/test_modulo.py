@@ -1,4 +1,4 @@
-"""Pruebas propias del módulo F+fetal: lo que hace y quién puede hacerlo.
+"""Pruebas propias del módulo F+mefi: lo que hace y quién puede hacerlo.
 Correr con `pytest modulos/monitoreo_fetal`.
 Las reglas comunes (sesión, perfiles, ícono, diseño, Ley 21.719) ya las prueba tests/test_reglas_modulos.py.
 """

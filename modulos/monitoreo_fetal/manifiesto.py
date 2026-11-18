@@ -1,4 +1,4 @@
-"""Identidad, ficha de tratamiento (Ley 21.719) y permisos del módulo F+fetal.
+"""Identidad, ficha de tratamiento (Ley 21.719) y permisos del módulo F+mefi.
 
 Módulo de simulación docente y evaluación determinística de parámetros cardiotocográficos
 (Protocolo de Vigilancia del Bienestar Fetal Intraparto V2 sept. 2025, ACOG CPG No. 10 2025,
@@ -10,7 +10,7 @@ CLAVE = "monitoreo_fetal"
 
 MANIFIESTO = Manifiesto(
     clave=CLAVE,
-    nombre="F+fetal",
+    nombre="F+mefi",
     descripcion="Simulador docente y evaluador normativo de cardiotocografía intraparto (Protocolo V2, ACOG CPG No. 10 y FIGO 2015).",
     version="0.1.1",
     responsable="Unidad de Parto Integral (SAIP)",
@@ -35,7 +35,7 @@ MANIFIESTO = Manifiesto(
         "admin": (f"{CLAVE}.ver", f"{CLAVE}.simular", f"{CLAVE}.moderar"),
     },
     acciones={
-        f"{CLAVE}_simulacion_creada": "Simulación registrada (F+fetal)",
-        f"{CLAVE}_simulacion_borrada": "Simulación borrada (F+fetal)",
+        f"{CLAVE}_simulacion_creada": "Simulación registrada (F+mefi)",
+        f"{CLAVE}_simulacion_borrada": "Simulación borrada (F+mefi)",
     },
 )

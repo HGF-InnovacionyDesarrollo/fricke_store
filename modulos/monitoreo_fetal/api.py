@@ -1,4 +1,4 @@
-"""API del módulo F+fetal, montada en /api/m/monitoreo_fetal/.
+"""API del módulo F+mefi, montada en /api/m/monitoreo_fetal/.
 Todo endpoint usa Depends(acceso(...)) y registra acciones en la bitácora sin datos personales en el detalle.
 Implementa el motor determinístico MEFI v2.0 (Protocolo V2 sept. 2025, ACOG CPG No. 10 2025, FIGO 2015 y NICE NG229)
 sobre escenarios docentes y simulaciones de capacitación sin datos de pacientes.

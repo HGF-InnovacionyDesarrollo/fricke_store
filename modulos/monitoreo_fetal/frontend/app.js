@@ -1,4 +1,4 @@
-// Módulo F+fetal — Simulador docente y evaluador determinístico MEFI v2.0
+// Módulo F+mefi — Simulador docente y evaluador determinístico MEFI v2.0
 // (Protocolo Institucional V2 sept. 2025, ACOG CPG No. 10 2025, FIGO 2015 y NICE NG229).
 // Sin datos de pacientes: uso exclusivo para entrenamiento y simulación de funcionarios clínicos.
 "use strict";

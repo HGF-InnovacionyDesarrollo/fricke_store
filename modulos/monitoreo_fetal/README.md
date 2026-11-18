@@ -1,4 +1,4 @@
-# Módulo F+fetal (`monitoreo_fetal`)
+# Módulo F+mefi (`monitoreo_fetal`)
 
 Simulador docente y evaluador determinístico de parámetros cardiotocográficos intraparto para Fricke Store, desarrollado por la **Unidad de Parto Integral (SAIP)** junto a la **Unidad de Innovación y Desarrollo**.
 
