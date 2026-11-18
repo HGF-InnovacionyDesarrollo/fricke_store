@@ -33,6 +33,19 @@ jobs:
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Alcance del cambio (los colaboradores solo tocan sus módulos)
+        if: github.event_name == 'pull_request'
+        # Se usa la versión del revisor y de la lista que está en main, para que una rama no pueda cambiarlas a su favor.
+        run: |
+          git show "$BASE:.github/revisar_alcance.py" > "$RUNNER_TEMP/revisar_alcance.py" 2>/dev/null || cp .github/revisar_alcance.py "$RUNNER_TEMP/"
+          git show "$BASE:.github/mantenedores.txt" > "$RUNNER_TEMP/mantenedores.txt" 2>/dev/null || cp .github/mantenedores.txt "$RUNNER_TEMP/"
+          python "$RUNNER_TEMP/revisar_alcance.py" "$AUTOR" "$BASE" "$CAMBIO"
+        env:
+          AUTOR: ${{ github.event.pull_request.user.login }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CAMBIO: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"

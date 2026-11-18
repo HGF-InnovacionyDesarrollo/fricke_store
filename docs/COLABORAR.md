@@ -66,8 +66,9 @@ python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --
   activo y elige quién lo ve.
 - `python backend/gestionar.py modulos` revisa que tu módulo cargue sin errores.
 
-Toca solo tu carpeta `modulos/<clave>/` y el ícono generado. Si necesitas cambiar algo común (`backend/`,
-`frontend/`, `docs/`), conversa antes con la Unidad.
+Toca solo tu carpeta `modulos/<clave>/` y el ícono generado. Todo lo demás es la base del sistema y solo lo cambia
+la Unidad: si tu *pull request* toca algo fuera de tu módulo, la revisión automática lo rechaza y te dice qué archivos
+sacar. Si necesitas un cambio común, pídelo a la Unidad.
 
 ## 5. Corre las pruebas
 

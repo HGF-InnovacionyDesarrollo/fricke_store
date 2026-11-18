@@ -30,7 +30,7 @@ http://localhost:8090. Usar siempre RUT de prueba, nunca datos reales.
 - Trabajar en una rama propia `modulo/<clave>` creada desde `main` al día, y crear el módulo solo con `python backend/gestionar.py nuevo-modulo --clave <clave> --nombre "<Nombre>" --familia <N> --pictograma <archivo.svg>`. Nunca crear la carpeta a mano ni copiar otro módulo.
 - Estructura según `docs/MODULOS.md`: `modulos/<clave>/` con `manifiesto.py` (identidad, ficha de tratamiento, permisos, acciones de bitácora), `api.py`, `migraciones/NNN_*.sql` (esquema PostgreSQL propio y rol propio por módulo; cada cambio en un archivo nuevo) y `frontend/`. Un módulo no importa código de otro módulo.
 - Sin login propio: todo endpoint usa `Depends(acceso("<clave>", "<clave>.<permiso>"))` y toda acción relevante queda en la bitácora, sin RUT en el detalle.
-- Tocar solo `modulos/<clave>/` y su ícono (`docs/logo/modulos/<nombre>/`, `frontend/img/modulos/<nombre>.svg`). Cambiar algo común (`backend/`, `frontend/`, `docs/`) se conversa antes con la Unidad de Innovación y Desarrollo.
+- Tocar solo `modulos/<clave>/` y su ícono (`docs/logo/modulos/<nombre>/`, `frontend/img/modulos/<nombre>.svg`). La base del sistema (`backend/`, `frontend/`, `docs/`, `tests/`, `.github/`, `AGENTS.md`, etc.) solo la cambia la Unidad de Innovación y Desarrollo: el chequeo automático rechaza el *pull request* de un colaborador que toque algo fuera de su módulo (`.github/revisar_alcance.py`). Si un módulo necesita un cambio común, no lo hagas: explícale a la persona que debe pedirlo a la Unidad.
 
 ## Datos personales y Ley 21.719
 

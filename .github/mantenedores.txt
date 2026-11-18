@@ -1,0 +1,4 @@
+# Cuentas de GitHub que pueden cambiar la base del sistema (todo lo que está fuera de los módulos).
+# Una por línea. Solo la Unidad de Innovación y Desarrollo edita esta lista.
+Rainiercastro
+HGF-InnovacionyDesarrollo
