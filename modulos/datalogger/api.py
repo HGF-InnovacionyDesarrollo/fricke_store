@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import math
 import socket
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field, ValidationError
 
 from plataforma import (ContextoEquipo, ContextoModulo, acceso, acceso_equipo, bd_modulo, crear_credencial_equipo,
                         credenciales_equipo, nombres_de, revocar_credencial_equipo)
@@ -442,10 +444,11 @@ class LecturaWifi(BaseModel):
     n: int = Field(ge=1, le=99)
     ieee: str = Field(pattern=r"^[0-9A-Fa-f]{16}$")
     nombre: str = Field(default="", max_length=40)
-    temp: float | None = Field(default=None, ge=-80, le=100)
-    hum: float | None = Field(default=None, ge=0, le=100)
-    edad_s: int = Field(default=0, ge=0)
-    bat: int | None = Field(default=None, ge=-1, le=100)
+    # Sin límites aquí: un valor raro de un sensor no debe hacer rechazar todo el envío (se descarta más abajo).
+    temp: float | None = None
+    hum: float | None = None
+    edad_s: float = 0
+    bat: float | None = None
 
 
 class EnvioWifi(BaseModel):
@@ -453,16 +456,32 @@ class EnvioWifi(BaseModel):
     serie: str = Field(default="", pattern=r"^([0-9A-Fa-f]{8,32})?$")
     firmware: str = Field(default="", max_length=16, pattern=r"^[0-9A-Za-z._-]*$")
     unix: int = Field(default=0, ge=0)
-    rssi: int | None = Field(default=None, ge=-120, le=0)
-    envios_ok: int | None = Field(default=None, ge=0)
-    envios_falla: int | None = Field(default=None, ge=0)
+    rssi: int | None = None
+    envios_ok: int | None = None
+    envios_falla: int | None = None
     sensores: list[LecturaWifi] = Field(default_factory=list, max_length=32)
 
 
+def _en_rango(v, minimo, maximo):
+    return float(v) if v is not None and math.isfinite(v) and minimo <= v <= maximo else None
+
+
 @router.post("/equipo")
-def recibir_envio_wifi(d: EnvioWifi, eq: ContextoEquipo = Depends(acceso_equipo(CLAVE))):
+async def recibir_envio_wifi(request: Request, eq: ContextoEquipo = Depends(acceso_equipo(CLAVE))):
     """Lo que manda un Monitor T/H cada minuto. Guarda el último valor de cada sensor (sin repetir) y el estado
     del equipo. No va a la bitácora: no lo hace una persona (la credencial registra su último uso e IP)."""
+    crudo = await request.body()
+    try:
+        d = EnvioWifi.model_validate_json(crudo)
+    except ValidationError as e:
+        # Se deja en el registro del servidor qué campo falló (solo datos de sensores, sin personas) para poder diagnosticar.
+        logging.getLogger("uvicorn.error").warning("F+data: envío WiFi rechazado (%s): %s", eq.equipo,
+                                                   [(".".join(map(str, x["loc"])), x["msg"]) for x in e.errors()][:6])
+        raise HTTPException(422, "El envío no tiene el formato esperado.")
+    return await run_in_threadpool(_guardar_envio_wifi, d, eq)
+
+
+def _guardar_envio_wifi(d: EnvioWifi, eq: ContextoEquipo):
     if d.monitor != eq.equipo:
         raise HTTPException(403, "Esta credencial es de otro equipo.")
     ahora_utc = datetime.now(timezone.utc)
@@ -474,7 +493,9 @@ def recibir_envio_wifi(d: EnvioWifi, eq: ContextoEquipo = Depends(acceso_equipo(
         eid = _equipo_id(c, d.monitor)
         c.execute("UPDATE equipos SET serie=COALESCE(NULLIF(?, ''), serie), firmware=COALESCE(NULLIF(?, ''), firmware), "
                   "wifi_ultimo_envio=?, wifi_rssi=?, wifi_envios_ok=?, wifi_envios_falla=? WHERE id=?",
-                  (d.serie.upper(), d.firmware, ahora_utc, d.rssi, d.envios_ok, d.envios_falla, eid))
+                  (d.serie.upper(), d.firmware, ahora_utc, d.rssi if d.rssi is not None and -120 <= d.rssi <= 0 else None,
+                   max(0, d.envios_ok) if d.envios_ok is not None else None,
+                   max(0, d.envios_falla) if d.envios_falla is not None else None, eid))
         for s in d.sensores:
             ieee = s.ieee.upper()
             fila = c.execute("SELECT id, equipo_id FROM sensores WHERE ieee=?", (ieee,)).fetchone()
@@ -485,15 +506,17 @@ def recibir_envio_wifi(d: EnvioWifi, eq: ContextoEquipo = Depends(acceso_equipo(
             else:
                 sid = c.execute("INSERT INTO sensores (ieee, equipo_id, numero, nombre) VALUES (?,?,?,?)",
                                 (ieee, eid, s.n, (s.nombre.strip() or f"Sensor {s.n}")[:40])).lastrowid
-            if s.temp is None and s.hum is None:
+            temp, hum = _en_rango(s.temp, -80, 100), _en_rango(s.hum, 0, 100)
+            bat = int(s.bat) if _en_rango(s.bat, 0, 100) is not None else None
+            if temp is None and hum is None:
                 continue  # el sensor aún no reporta desde que arrancó el equipo
-            fecha = (base - timedelta(seconds=s.edad_s)).replace(microsecond=0)
+            fecha = (base - timedelta(seconds=max(0, min(int(s.edad_s), 86400)))).replace(microsecond=0)
             # El mismo reporte llega en cada envío (cada minuto) con ±1 s de diferencia: se guarda una vez.
             r = c.execute("""INSERT INTO lecturas_wifi (sensor_id, fecha, temperatura, humedad, bateria)
                              SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (
                                  SELECT 1 FROM lecturas_wifi WHERE sensor_id=? AND fecha BETWEEN ? AND ?)
                              ON CONFLICT (sensor_id, fecha) DO NOTHING""",
-                          (sid, fecha, s.temp, s.hum, s.bat if s.bat is not None and s.bat >= 0 else None,
+                          (sid, fecha, temp, hum, bat,
                            sid, fecha - timedelta(seconds=5), fecha + timedelta(seconds=5)))
             nuevas += r.rowcount
     return {"ok": True, "lecturas_nuevas": nuevas}
