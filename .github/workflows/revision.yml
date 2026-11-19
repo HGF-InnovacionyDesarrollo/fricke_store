@@ -53,5 +53,9 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - name: Instalar dependencias
         run: pip install -r requirements-dev.txt
+      - name: Vulnerabilidades conocidas en las librerías (pip-audit)
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
       - name: Pruebas del portal, reglas de módulos y pruebas de cada módulo
         run: pytest -rf

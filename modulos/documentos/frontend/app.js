@@ -264,8 +264,8 @@ function validarPdf(archivo) {
   // ---------------------------------------------------------------- papelera
   async function pintarPapelera() {
     main.innerHTML = `<div class="cabecera-pantalla"><h1 class="titulo-pantalla">Papelera</h1></div>
-      <p class="aviso-suave">${linea("info")}<span>Lo que envías a la papelera y las versiones reemplazadas se guardan 30 días.
-        Después se borran solos. Mientras tanto puedes restaurarlos.</span></p>
+      <p class="aviso-suave">${linea("info")}<span>Lo que envías a la papelera se guarda 30 días. Las versiones reemplazadas quedan 5 años como
+        historial, para saber qué versión estaba vigente en cada fecha. Después se borran solos. Mientras tanto puedes restaurarlos.</span></p>
       <div id="lista"></div>`;
     const lista = document.getElementById("lista");
     if (!admin) return estadoSinPermiso(lista, "Solo quienes administran documentos ven la papelera.");
@@ -300,7 +300,7 @@ function validarPdf(archivo) {
     };
     lista.innerHTML = `
       ${r.documentos.length ? `<h2 class="titulo-seccion">Documentos eliminados</h2><ul class="lista tarjeta">${r.documentos.map((f) => fila(f, "documentos")).join("")}</ul>` : ""}
-      ${r.versiones.length ? `<h2 class="titulo-seccion">Versiones reemplazadas</h2>
+      ${r.versiones.length ? `<h2 class="titulo-seccion">Historial de versiones (5 años)</h2>
         <p class="pista">Restaurar una versión la vuelve a publicar; la que está publicada ahora pasa a la papelera.</p>
         <ul class="lista tarjeta">${r.versiones.map((f) => fila(f, "versiones")).join("")}</ul>` : ""}`;
     lista.querySelectorAll("[data-restaurar]").forEach((b) => b.onclick = async () => {
@@ -328,7 +328,7 @@ function validarPdf(archivo) {
           <dt>Quién lo administra</dt><dd>Solo las personas con el permiso «Administrar documentos» crean carpetas, suben,
             reemplazan y eliminan. Si lo necesitas, pídelo a la Unidad de Innovación y Desarrollo.</dd>
           <dt>Archivos</dt><dd>Solo PDF, hasta ${MAX_MB} MB cada uno.</dd>
-          <dt>Papelera</dt><dd>Lo eliminado y las versiones reemplazadas se guardan 30 días y luego se borran.</dd>
+          <dt>Papelera e historial</dt><dd>Lo eliminado se guarda 30 días. Las versiones reemplazadas quedan 5 años como historial. Luego se borran.</dd>
           <dt>Para qué usa datos</dt><dd>${esc(modulo.finalidad)}</dd>
           <dt>Versión</dt><dd>${esc(modulo.version)}</dd></dl></section>`;
   }
@@ -396,7 +396,7 @@ function validarPdf(archivo) {
     let archivo = null;
     dialogo({
       titulo: "Reemplazar PDF",
-      html: `<p class="dlg-texto">Sube la versión nueva de «${esc(d.titulo)}». La versión actual quedará 30 días en la papelera por si necesitas volver a ella.</p>
+      html: `<p class="dlg-texto">Sube la versión nueva de «${esc(d.titulo)}». La versión actual quedará 5 años en el historial por si necesitas volver a ella.</p>
         ${AVISO_PDF}
         <div class="elegir-archivo"><input type="file" id="rp-archivo" accept=".pdf,application/pdf" class="sr">
           <label for="rp-archivo" class="btn btn-borde">${linea("upload")}Elegir PDF</label>
@@ -410,7 +410,7 @@ function validarPdf(archivo) {
           await api(`${API}/documentos/${d.id}/version`, { metodo: "POST", datos: {
             nombre_archivo: archivo.name, contenido: await leerBase64(archivo) } });
         } catch (e) { mostrarErrorEn(zona, e.message); return false; }
-        toast("PDF reemplazado. La versión anterior quedó en la papelera."); repintar(); return true;
+        toast("PDF reemplazado. La versión anterior quedó en el historial."); repintar(); return true;
       } }],
     });
     const input = document.getElementById("rp-archivo");

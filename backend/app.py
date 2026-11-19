@@ -4,6 +4,8 @@ Ejecutar:  python -m uvicorn app:app --app-dir backend --port 8090
 """
 import json
 import re
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -137,6 +139,41 @@ class Login(BaseModel):
 
 ERROR_GENERICO = "RUT o contraseña incorrectos."
 
+# Fallos de ingreso por dirección IP (ventana móvil): frena a quien prueba claves contra muchas cuentas a la vez.
+_FALLOS_IP: dict[str, list[float]] = {}
+_LOCK_FALLOS = threading.Lock()
+
+
+def _demasiados_fallos_ip(ip: str, sumar: bool = False) -> bool:
+    ahora_s, ventana = time.monotonic(), cfg.VENTANA_PUBLICO_MIN * 60
+    with _LOCK_FALLOS:
+        q = [t for t in _FALLOS_IP.get(ip, []) if ahora_s - t < ventana]
+        if sumar:
+            q.append(ahora_s)
+        _FALLOS_IP[ip] = q
+        return len(q) >= cfg.MAX_FALLOS_IP
+
+
+def fallo_de_clave(uid: int, ip: str, accion: str, detalle: str | None = None) -> bool:
+    """Cuenta un intento fallido de la persona (contraseña o segundo factor, en el ingreso, al desbloquear la pantalla
+    o al confirmar una acción). Al llegar a ECO_MAX_INTENTOS bloquea la cuenta y cierra sus sesiones.
+    Devuelve True si la cuenta quedó bloqueada."""
+    _demasiados_fallos_ip(ip, sumar=True)
+    with bd() as c:
+        n = c.execute("UPDATE usuarios SET intentos_fallidos=intentos_fallidos+1 WHERE id=? RETURNING intentos_fallidos",
+                      (uid,)).fetchone()[0]
+        bloqueo = n >= cfg.MAX_INTENTOS
+        if bloqueo:
+            hasta = (datetime.now(timezone.utc) + timedelta(minutes=cfg.BLOQUEO_MIN)).isoformat(timespec="seconds")
+            c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=? WHERE id=?", (hasta, uid))
+            c.execute("DELETE FROM sesiones WHERE usuario_id=?", (uid,))
+    auditar(accion, uid, ((detalle + " · ") if detalle else "") + ("cuenta bloqueada" if bloqueo else f"intento {n}"), ip)
+    return bloqueo
+
+
+MENSAJE_BLOQUEO = (f"Demasiados intentos fallidos: la cuenta quedó bloqueada {cfg.BLOQUEO_MIN} minutos "
+                   f"y se cerraron sus sesiones. Si no fuiste tú, avisa a la Mesa de ayuda ({cfg.MESA_AYUDA}).")
+
 
 @app.post("/api/auth/login")
 def login(datos: Login, request: Request, response: Response):
@@ -144,27 +181,24 @@ def login(datos: Login, request: Request, response: Response):
     rut = normalizar_rut(datos.rut)
     if not rut:
         raise HTTPException(400, "El RUT ingresado no es válido.")
+    if _demasiados_fallos_ip(ip):
+        auditar("login_rechazado_ip", None, f"rut {enmascarar_rut(rut)}", ip)
+        raise HTTPException(429, f"Demasiados intentos fallidos desde este equipo. Intenta en {cfg.VENTANA_PUBLICO_MIN} minutos.")
     with bd() as c:
         u = c.execute("SELECT * FROM usuarios WHERE rut=?", (rut,)).fetchone()
         if not u or not u["activo"]:
             verificar_clave(datos.clave, HASH_SEÑUELO)  # mismo tiempo de respuesta
+            _demasiados_fallos_ip(ip, sumar=True)
             auditar("login_fallido", None, f"rut {enmascarar_rut(rut)}", ip)
             raise HTTPException(401, ERROR_GENERICO)
         if u["bloqueado_hasta"] and _dt(u["bloqueado_hasta"]) > datetime.now(timezone.utc):
             auditar("login_rechazado_bloqueo", u["id"], None, ip)
             raise HTTPException(429, f"Cuenta bloqueada temporalmente por intentos fallidos. "
                                      f"Intenta en {cfg.BLOQUEO_MIN} minutos o llama a {cfg.MESA_AYUDA}.")
-        if not verificar_clave(datos.clave, u["clave_hash"]):
-            intentos = u["intentos_fallidos"] + 1
-            bloqueo = None
-            if intentos >= cfg.MAX_INTENTOS:
-                bloqueo = (datetime.now(timezone.utc) + timedelta(minutes=cfg.BLOQUEO_MIN)).isoformat(timespec="seconds")
-                intentos = 0
-            c.execute("UPDATE usuarios SET intentos_fallidos=?, bloqueado_hasta=? WHERE id=?", (intentos, bloqueo, u["id"]))
-            c.commit()
-            auditar("login_fallido", u["id"], "cuenta bloqueada" if bloqueo else f"intento {intentos}", ip)
-            raise HTTPException(401, ERROR_GENERICO)
-
+    if not verificar_clave(datos.clave, u["clave_hash"]):
+        fallo_de_clave(u["id"], ip, "login_fallido")
+        raise HTTPException(401, ERROR_GENERICO)
+    with bd() as c:
         token = nuevo_token()
         now = datetime.now(timezone.utc)
         # 1 = falta el código de la app · 2 = debe configurar la app (obligatorio y aún sin activar)
@@ -176,7 +210,10 @@ def login(datos: Login, request: Request, response: Response):
              (now + timedelta(hours=cfg.SESION_MAXIMA_HORAS)).isoformat(timespec="seconds"),
              ip, (request.headers.get("user-agent") or "")[:200], pendiente),
         )
-        c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=NULL WHERE id=?", (u["id"],))
+        if not pendiente:
+            # Con segundo factor pendiente el contador NO se reinicia: así no se pueden probar códigos sin límite
+            # volviendo a ingresar la contraseña. Se reinicia cuando el código es correcto.
+            c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=NULL WHERE id=?", (u["id"],))
     auditar("login" if not pendiente else "login_clave_correcta", u["id"],
             None if not pendiente else ("falta el segundo factor" if pendiente == 1 else "debe configurar el segundo factor"), ip)
     _poner_cookie(response, token, segura=request.url.scheme == "https")
@@ -198,6 +235,8 @@ class CodigoMfa(BaseModel):
 
 
 def _mfa_fallido(ctx: Contexto):
+    if fallo_de_clave(ctx.u["id"], ctx.ip, "mfa_fallido", "contador de la cuenta"):
+        raise HTTPException(401, MENSAJE_BLOQUEO)
     with bd() as c:
         n = c.execute("UPDATE sesiones SET mfa_intentos=mfa_intentos+1 WHERE id=? RETURNING mfa_intentos",
                       (ctx.s["id"],)).fetchone()[0]
@@ -228,6 +267,7 @@ def mfa_verificar(d: CodigoMfa, ctx: Contexto = Depends(_sesion_mfa)):
             if paso is not None:
                 c.execute("UPDATE usuarios SET mfa_ultimo_paso=? WHERE id=?", (paso, ctx.u["id"]))
             c.execute("UPDATE sesiones SET mfa_pendiente=0, mfa_intentos=0, ultima_actividad=? WHERE id=?", (ahora(), ctx.s["id"]))
+            c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=NULL WHERE id=?", (ctx.u["id"],))
             quedan = c.execute("SELECT COUNT(*) FROM mfa_respaldo WHERE usuario_id=? AND usado_en IS NULL", (ctx.u["id"],)).fetchone()[0]
     if paso is None and not usado_respaldo:
         _mfa_fallido(ctx)
@@ -263,6 +303,7 @@ def mfa_activar(d: CodigoMfa, ctx: Contexto = Depends(_sesion_mfa)):
         c.executemany("INSERT INTO mfa_respaldo (usuario_id, codigo_hash) VALUES (?,?)",
                       [(ctx.u["id"], mfa.hash_respaldo(x)) for x in codigos])
         c.execute("UPDATE sesiones SET mfa_pendiente=0, mfa_intentos=0, ultima_actividad=? WHERE id=?", (ahora(), ctx.s["id"]))
+        c.execute("UPDATE usuarios SET intentos_fallidos=0, bloqueado_hasta=NULL WHERE id=?", (ctx.u["id"],))
     auditar("mfa_activado", ctx.u["id"], None, ctx.ip)
     auditar("login", ctx.u["id"], "con segundo factor", ctx.ip)
     return {"ok": True, "codigos_respaldo": codigos}
@@ -298,10 +339,13 @@ class Desbloqueo(BaseModel):
 def desbloquear(datos: Desbloqueo, request: Request, response: Response):
     ctx = _sesion(request, permitir_bloqueada=True, tocar=False)
     if not verificar_clave(datos.clave, ctx.u["clave_hash"]):
-        auditar("desbloqueo_fallido", ctx.u["id"], None, ctx.ip)
+        # Una pantalla bloqueada en un PC compartido no debe permitir probar contraseñas sin límite.
+        if fallo_de_clave(ctx.u["id"], ctx.ip, "desbloqueo_fallido"):
+            raise HTTPException(401, MENSAJE_BLOQUEO)
         raise HTTPException(401, "Contraseña incorrecta.")
     with bd() as c:
         c.execute("UPDATE sesiones SET bloqueada=0, ultima_actividad=? WHERE id=?", (ahora(), ctx.s["id"]))
+        c.execute("UPDATE usuarios SET intentos_fallidos=0 WHERE id=?", (ctx.u["id"],))
     auditar("pantalla_desbloqueada", ctx.u["id"], None, ctx.ip)
     return {"ok": True}
 
@@ -314,6 +358,8 @@ class CambioClave(BaseModel):
 @app.post("/api/auth/cambiar-clave")
 def cambiar_clave(datos: CambioClave, ctx: Contexto = Depends(sesion)):
     if not verificar_clave(datos.actual, ctx.u["clave_hash"]):
+        if fallo_de_clave(ctx.u["id"], ctx.ip, "cambio_clave_fallido"):
+            raise HTTPException(401, MENSAJE_BLOQUEO)
         raise HTTPException(400, "La contraseña actual no es correcta.")
     if datos.actual == datos.nueva:
         raise HTTPException(400, "La nueva contraseña debe ser distinta de la actual.")
@@ -437,6 +483,8 @@ ETIQUETAS_ACCION = {
     "pantalla_bloqueada": "Pantalla bloqueada",
     "pantalla_desbloqueada": "Pantalla desbloqueada",
     "desbloqueo_fallido": "Desbloqueo fallido",
+    "cambio_clave_fallido": "Contraseña actual incorrecta al cambiarla",
+    "login_rechazado_ip": "Acceso rechazado (demasiados intentos desde ese equipo)",
     "clave_cambiada": "Contraseña cambiada",
     "login_clave_correcta": "Contraseña correcta, falta el segundo factor",
     "mfa_fallido": "Código del segundo factor incorrecto",
@@ -482,6 +530,7 @@ ETIQUETAS_ACCION = {
     "modulo_registrado": "Módulo registrado desde el código",
     "modulo_actualizado": "Módulo actualizado desde el código",
     "modulo_depurado": "Datos de un módulo eliminados por plazo de conservación",
+    "depuracion_fallida": "Depuración por plazo de conservación con errores",
     "permiso_otorgado": "Permiso de módulo otorgado",
     "permiso_revocado": "Permiso de módulo revocado",
 }

@@ -252,3 +252,36 @@ def test_envio_wifi_con_sesion_sigue_exigiendo_cabecera_anti_csrf(personas):
                    headers={"X-Ecosistema": "1"})
     r = navegador.post(f"{API}/equipo", json=envio("MTH-97"), auth=("equipo", secreto))
     assert r.status_code == 403
+
+
+def test_envio_wifi_genera_alarma_sin_esperar_la_sd(personas):
+    admin, _ = personas
+    tc = cliente(admin)
+    secreto = tc.post(f"{API}/envio-wifi", json={"equipo": "MTH-90"}).json()["secreto"]
+    equipo = TestClient(portal.app)
+    ieee = "A4C13880C7479090"
+    assert equipo.post(f"{API}/equipo", json=envio("MTH-90", ieee=ieee), auth=("equipo", secreto)).status_code == 200
+    sid = next(s["id"] for e in tc.get(f"{API}/sensores").json()["equipos"] for s in e["sensores"] if s["ieee"] == ieee)
+    med = next(p for p in tc.get(f"{API}/sensores").json()["perfiles"] if p["clave"] == "MED")
+    tc.put(f"{API}/sensores/{sid}", json={"ubicacion": "Farmacia", "activo": True, "perfil_id": med["id"]})
+    antes = len(tc.get(f"{API}/alarmas").json())
+    # 35 °C en Medicamentos (alarma sobre 30 °C): la alarma aparece con el envío, sin importar la SD
+    caliente = envio("MTH-90", unix=datetime.now(timezone.utc).timestamp() + 120, edad=5, temp=35, ieee=ieee)
+    assert equipo.post(f"{API}/equipo", json=caliente, auth=("equipo", secreto)).json()["lecturas_nuevas"] == 1
+    alarmas = tc.get(f"{API}/alarmas").json()
+    assert len(alarmas) == antes + 1
+    assert any(float(a["extremo"]) == 35 for a in alarmas)
+
+
+def test_envio_wifi_no_se_adueña_de_sensores_de_otro_equipo_activo(personas):
+    admin, _ = personas
+    tc = cliente(admin)
+    s_a = tc.post(f"{API}/envio-wifi", json={"equipo": "MTH-88"}).json()["secreto"]
+    s_b = tc.post(f"{API}/envio-wifi", json={"equipo": "MTH-89"}).json()["secreto"]
+    equipo = TestClient(portal.app)
+    ieee = "A4C13880C7478888"
+    assert equipo.post(f"{API}/equipo", json=envio("MTH-88", ieee=ieee), auth=("equipo", s_a)).status_code == 200
+    r = equipo.post(f"{API}/equipo", json=envio("MTH-89", ieee=ieee, edad=1), auth=("equipo", s_b))
+    assert r.status_code == 200 and r.json()["lecturas_nuevas"] == 0
+    dueño = next(e["codigo"] for e in tc.get(f"{API}/sensores").json()["equipos"] for s in e["sensores"] if s["ieee"] == ieee)
+    assert dueño == "MTH-88"

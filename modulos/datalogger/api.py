@@ -108,9 +108,9 @@ def resumen(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
             FROM sensores s JOIN equipos e ON e.id = s.equipo_id
             LEFT JOIN LATERAL (SELECT * FROM lecturas WHERE sensor_id = s.id ORDER BY fecha DESC LIMIT 1) l ON TRUE
             LEFT JOIN LATERAL (SELECT * FROM lecturas_wifi WHERE sensor_id = s.id ORDER BY fecha DESC LIMIT 1) w ON TRUE
-            WHERE s.activo ORDER BY e.codigo, s.numero NULLS LAST, s.nombre""")]
+            WHERE s.activo = 1 ORDER BY e.codigo, s.numero NULLS LAST, s.nombre""")]
         pendientes = c.execute("SELECT count(*) FROM excursiones e JOIN sensores s ON s.id = e.sensor_id "
-                               "WHERE e.revisada_por IS NULL AND s.activo").fetchone()[0]
+                               "WHERE e.revisada_por IS NULL AND s.activo = 1").fetchone()[0]
         ultima = c.execute("SELECT creado_en, hasta FROM importaciones ORDER BY id DESC LIMIT 1").fetchone()
     equipos: dict[str, dict] = {}
     for f in filas:
@@ -228,7 +228,8 @@ def descargar(sid: int, desde: str | None = None, hasta: str | None = None,
 def _excursiones(c, donde: str, params: tuple) -> list[dict]:
     filas = [dict(f) for f in c.execute(f"""
         SELECT x.*, s.nombre AS sensor, s.ubicacion, e.codigo AS equipo,
-               (SELECT max(fecha) FROM lecturas WHERE sensor_id = x.sensor_id) AS ultimo_dato FROM excursiones x
+               greatest((SELECT max(fecha) FROM lecturas WHERE sensor_id = x.sensor_id),
+                        (SELECT max(fecha) FROM lecturas_wifi WHERE sensor_id = x.sensor_id)) AS ultimo_dato FROM excursiones x
         JOIN sensores s ON s.id = x.sensor_id JOIN equipos e ON e.id = s.equipo_id
         WHERE {donde} ORDER BY x.inicio DESC LIMIT 500""", params)]
     nombres = nombres_de({f["revisada_por"] for f in filas if f["revisada_por"]})
@@ -241,7 +242,7 @@ def _excursiones(c, donde: str, params: tuple) -> list[dict]:
 @router.get("/alarmas")
 def alarmas(pendientes: bool = True, ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
     with bd_modulo(CLAVE) as c:
-        return _excursiones(c, "s.activo AND (x.revisada_por IS NULL OR ?::int = 0)", (pendientes,))
+        return _excursiones(c, "s.activo = 1 AND (x.revisada_por IS NULL OR ?::int = 0)", (pendientes,))
 
 
 class Revision(BaseModel):
@@ -275,8 +276,11 @@ def recalcular_excursiones(c, sensor_id: int, desde: datetime):
     if abierta:
         ventana = abierta
     c.execute("DELETE FROM excursiones WHERE sensor_id=? AND inicio >= ? AND revisada_por IS NULL", (sensor_id, ventana))
-    lecturas = c.execute("SELECT fecha, temperatura, humedad FROM lecturas WHERE sensor_id=? AND fecha >= ? ORDER BY fecha",
-                         (sensor_id, ventana)).fetchall()
+    # Lo de la tarjeta SD y lo que llegó por WiFi: así la alarma aparece apenas llega el valor, sin esperar la SD.
+    lecturas = c.execute("""SELECT fecha, temperatura, humedad FROM lecturas WHERE sensor_id=? AND fecha >= ?
+                            UNION ALL
+                            SELECT fecha, temperatura, humedad FROM lecturas_wifi WHERE sensor_id=? AND fecha >= ?
+                            ORDER BY fecha""", (sensor_id, ventana, sensor_id, ventana)).fetchall()
     for variable, col, var in (("temperatura", "temperatura", "t"), ("humedad", "humedad", "h")):
         actual = None
         for f in lecturas:
@@ -343,7 +347,7 @@ class CambioSensor(BaseModel):
 def actualizar_sensor(sid: int, d: CambioSensor, ctx: ContextoModulo = Depends(acceso(CLAVE, CONFIGURAR))):
     with bd_modulo(CLAVE) as c:
         _sensor(c, sid)
-        c.execute("UPDATE sensores SET ubicacion=?, activo=(?::int = 1) WHERE id=?", (d.ubicacion.strip(), d.activo, sid))
+        c.execute("UPDATE sensores SET ubicacion=?, activo=? WHERE id=?", (d.ubicacion.strip(), int(d.activo), sid))
         if d.perfil_id != 0:
             if d.perfil_id is not None and d.perfil_id not in _perfiles(c):
                 raise HTTPException(422, "Ese tipo de almacenamiento no existe.")
@@ -496,6 +500,7 @@ def _guardar_envio_wifi(d: EnvioWifi, eq: ContextoEquipo):
     if base is None or abs(base - ahora_utc) > timedelta(hours=12):
         base = ahora_utc  # el equipo no tiene hora (o está muy desfasada): se usa la del servidor
     nuevas = 0
+    primera_nueva: dict[int, datetime] = {}
     with bd_modulo(CLAVE) as c:
         eid = _equipo_id(c, d.monitor)
         c.execute("UPDATE equipos SET serie=COALESCE(NULLIF(?, ''), serie), firmware=COALESCE(NULLIF(?, ''), firmware), "
@@ -509,6 +514,13 @@ def _guardar_envio_wifi(d: EnvioWifi, eq: ContextoEquipo):
             if fila:
                 sid = fila["id"]
                 if fila["equipo_id"] != eid:
+                    # Un sensor pasa a otro equipo solo si el anterior ya no está enviando (se re-emparejó).
+                    # Así una credencial filtrada de un equipo no puede "adueñarse" de los sensores de otro.
+                    otro = c.execute("SELECT codigo, wifi_ultimo_envio FROM equipos WHERE id=?", (fila["equipo_id"],)).fetchone()
+                    if otro and otro["wifi_ultimo_envio"] and ahora_utc - otro["wifi_ultimo_envio"] < timedelta(hours=24):
+                        logging.getLogger("uvicorn.error").warning(
+                            "F+data: %s envió el sensor %s, que es de %s (activo): se ignora", eq.equipo, ieee, otro["codigo"])
+                        continue
                     c.execute("UPDATE sensores SET equipo_id=?, numero=? WHERE id=?", (eid, s.n, sid))
             else:
                 sid = c.execute("INSERT INTO sensores (ieee, equipo_id, numero, nombre) VALUES (?,?,?,?)",
@@ -526,6 +538,10 @@ def _guardar_envio_wifi(d: EnvioWifi, eq: ContextoEquipo):
                           (sid, fecha, temp, hum, bat,
                            sid, fecha - timedelta(seconds=5), fecha + timedelta(seconds=5)))
             nuevas += r.rowcount
+            if r.rowcount:
+                primera_nueva[sid] = min(primera_nueva.get(sid, fecha), fecha)
+        for sid, desde in primera_nueva.items():
+            recalcular_excursiones(c, sid, desde)
     return {"ok": True, "lecturas_nuevas": nuevas}
 
 

@@ -21,7 +21,7 @@ máx. 3 elementos, sin texto) centrado en una caja de 24. Cinco familias:
 | 4 Operaciones y equipos | #58A87A → #C3AD55 | Tinta #2B3440 |
 | 5 Personas y gestión | #C7AD53 → #FCB040 | Tinta #2B3440 |
 
-Nombre en Outfit 500, tinta, sin degradado; una o dos palabras, mayúscula solo inicial, sin "Fricke", "App" ni "Sistema".
+Nombre en Outfit 500, tinta, sin degradado. El nombre es «F+» y una palabra corta en minúsculas, sin espacios (F+data, F+mefi, F+docs), sin "Fricke", "App" ni "Sistema". Regla del 18 nov 2026, la verifica el portal al cargar el módulo (reemplaza la regla de "una o dos palabras con mayúscula inicial" del PDF).
 Archivos en `docs/logo/modulos/<nombre>/` y copia en `frontend/img/modulos/<nombre>.svg`.
 
 **Interfaz.** Como una app de Google Workspace sobre Material Design 3, sobria:

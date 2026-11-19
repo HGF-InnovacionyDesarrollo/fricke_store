@@ -4,7 +4,7 @@ Todo módulo del ecosistema (SIMI, monitor de temperatura, equipos médicos, etc
 Existen para que cada módulo se vea y se comporte como parte del mismo portal, comparta el ingreso con RUT
 y cumpla la **Ley 21.719** desde el primer día, sin que cada equipo tenga que reinventarlo.
 
-La referencia viva es el módulo de ejemplo [`modulos/ejemplo/`](../modulos/ejemplo/) (Tablón de avisos).
+La referencia viva es el módulo de ejemplo [`modulos/ejemplo/`](../modulos/ejemplo/) (F+avisos, un tablón de avisos).
 Las palabras **debe** y **no debe** son obligatorias; **conviene** es una recomendación.
 
 ---
@@ -12,7 +12,7 @@ Las palabras **debe** y **no debe** son obligatorias; **conviene** es una recome
 ## 1. Crear un módulo
 
 ```bash
-python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2 [--pictograma pill.svg]
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "F+farmacia" --familia 2 [--pictograma pill.svg]
 ```
 
 Copia el ejemplo a `modulos/farmacia/` con la clave ya reemplazada. Luego:
@@ -49,7 +49,7 @@ modulos/<clave>/
 
 ```python
 MANIFIESTO = Manifiesto(
-    clave="farmacia", nombre="Farmacia", descripcion="Una línea", version="0.1.0",
+    clave="farmacia", nombre="F+farmacia", descripcion="Una línea", version="0.1.0",
     responsable="Unidad de Farmacia", icono="documento", color="#1565c0", orden=100,
     perfiles_iniciales=("admin",),
     tratamiento=FichaTratamiento(

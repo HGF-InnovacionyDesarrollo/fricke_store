@@ -9,7 +9,7 @@ CLAVE = "ejemplo"
 
 MANIFIESTO = Manifiesto(
     clave=CLAVE,
-    nombre="Tablón de avisos",
+    nombre="F+avisos",
     descripcion="Módulo de ejemplo: avisos internos de la unidad.",
     version="0.1.0",
     responsable="Unidad de Innovación y Desarrollo",
@@ -34,7 +34,7 @@ MANIFIESTO = Manifiesto(
         "admin": (f"{CLAVE}.ver", f"{CLAVE}.publicar", f"{CLAVE}.moderar"),
     },
     acciones={
-        f"{CLAVE}_aviso_publicado": "Aviso publicado (Tablón de avisos)",
-        f"{CLAVE}_aviso_borrado": "Aviso borrado (Tablón de avisos)",
+        f"{CLAVE}_aviso_publicado": "Aviso publicado (F+avisos)",
+        f"{CLAVE}_aviso_borrado": "Aviso borrado (F+avisos)",
     },
 )

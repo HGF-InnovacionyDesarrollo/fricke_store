@@ -23,13 +23,14 @@ const ETIQUETA_HIPOXIA = {
 
 (async function () {
   let filtro = "";
-  let pantalla = "todas";
+  let pantalla = "mias";
   const main = document.getElementById("contenido");
 
   const inicio = await iniciarModulo(CLAVE, {
     destinos: [
-      { id: "todas", etiqueta: "Todas", icono: "list" },
+      // Cada persona ve sus propias simulaciones; las de todos, solo quien modera (privacidad entre colegas).
       { id: "mias", etiqueta: "Mías", icono: "user", permiso: `${CLAVE}.simular` },
+      { id: "todas", etiqueta: "Todas", icono: "list", permiso: `${CLAVE}.moderar` },
       { id: "casos", etiqueta: "Casos", icono: "inbox" },
       { id: "acerca", etiqueta: "Acerca", icono: "info" },
     ],
@@ -59,9 +60,9 @@ const ETIQUETA_HIPOXIA = {
 
   // ---------------------------------------------------------------- lista de simulaciones
   async function pintarSimulaciones() {
-    const mias = pantalla === "mias";
+    const mias = pantalla !== "todas" || !modulo.puede(`${CLAVE}.moderar`);
     main.innerHTML = `<div class="cabecera-pantalla"><h1 class="titulo-pantalla">${mias ? "Mis simulaciones" : "Simulaciones de la unidad"}</h1></div>
-      <p class="aviso-suave" style="max-width:840px">${linea("shield")}<span>Entorno exclusivo de simulación docente (Protocolo V2 / ACOG CPG No. 10 / FIGO 2015). No ingreses datos de pacientes. Los ejercicios se depuran automáticamente al cumplir un año.</span></p>
+      <p class="aviso-suave" style="max-width:840px">${linea("shield")}<span>Entorno exclusivo de simulación docente (Protocolo V2 / ACOG CPG No. 10 / FIGO 2015). No escribas nombres, RUT ni otros datos de pacientes en el título ni en la nota. Los ejercicios se depuran automáticamente al cumplir un año.</span></p>
       <div class="lista-simulaciones" id="lista" style="margin-top:16px"></div>`;
     const lista = document.getElementById("lista");
     cargando(true, lista);

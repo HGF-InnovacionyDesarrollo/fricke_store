@@ -88,6 +88,28 @@ Las tablas siguen la clasificación pedida. "Obligatorio" significa que hay una 
 | A10 | Bitácora en UTC sincronizada (NTP con SHOA) y plazo de conservación declarado | DS 9 art. 13; Ley 21.719 art. 3 c) | Hash encadenado sin retención definida | Configurar NTP, registrar en UTC, fijar retención (90 días o más en caliente, más para auditoría) y declararla en la política |
 | A11 | Contrato de encargado y garantías de transferencia internacional antes de conectar cualquier nube o LLM | Ley 21.719 arts. 15 bis y 27-28; Ley 19.886 | El asistente es un mock | No conectar un proveedor externo sin contrato por Mercado Público (Directiva 44/2026) |
 
+#### Estado al 19-11-2026 (la columna "Estado actual" de arriba es la del informe original, del 16-11-2026)
+
+| # | Lo que ya hace el portal | Lo que falta (casi todo es un acto administrativo o de TI) |
+|---|---|---|
+| A1 | Registro de incidentes con los plazos de ANCI y de la Agencia, y alertas en el panel cuando vencen | Procedimiento escrito y aprobado; contactos de ANCI y de la Agencia |
+| A2 | Perfil "Delegado de Ciberseguridad" con bitácora, incidentes y contención, sin gestionar cuentas | Resolución del Director que lo designe (independiente de TI) y acreditación ante ANCI |
+| A3 | (no es del portal) | Política de Seguridad de la Información aprobada; verificar si el SSVQ ya la tiene |
+| A4 | HTTPS con TLS 1.2+, HSTS y cookie `Secure` (`ECO_TLS_CERT`/`ECO_TLS_KEY`); el HTTP solo redirige o recibe envíos de equipos | Certificado institucional y servidor con TI; red separada para los equipos (`docs/OPERACION.md`) |
+| A5 | Aviso de privacidad público (`/privacidad`, sin ingresar) con los 12 contenidos, versionado y con aceptación registrada | Aprobación formal del Director |
+| A6 | Días corridos, acuse de recibo, una prórroga, bloqueo en 2 días hábiles, denegación con la leyenda de reclamo, jefe superior del servicio | Revisión del flujo por el DPD |
+| A7 | `respaldo.py`: pg_dump cifrado, copia externa, rotación, prueba de restauración y alertas en el panel | Programar las tareas en el servidor y guardar las claves fuera de él |
+| A8 | Alertas en el panel, `/api/salud` para monitoreo, copia JSONL de la bitácora para un SIEM | Monitoreo externo (Uptime Kuma o Zabbix) y SIEM con TI |
+| A9 | Contención auditada: cerrar todas las sesiones, forzar cambio de claves privilegiadas, suspender módulos, pausar formularios | Ensayo con el Delegado de Ciberseguridad |
+| A10 | Bitácora en UTC, encadenada, retención de 5 años con archivo sellado y ancla diaria fuera de la base | NTP con SHOA en el servidor |
+| A11 | El asistente sigue siendo una maqueta sin proveedor externo | Contrato antes de conectar cualquier nube o LLM |
+
+Del grupo B ya está B3 (segundo factor TOTP obligatorio para perfiles privilegiados y exigible a cualquier persona). Del
+grupo C: C4 (PostgreSQL, revisión automática con pruebas y pip-audit), C5 (15 caracteres mínimo y lista de bloqueo, sin
+reglas de composición) y la base de C1 (los módulos con datos sensibles no se publican sin EIPD aprobada por el DPD).
+Siguen pendientes C3 (IdP), C8 (recertificación de accesos), C9 (correo institucional) y C10.
+
+
 ### B. Obligatorio cuando lleguen módulos con datos de pacientes (o se abra el portal a pacientes)
 
 | # | Brecha | Fundamento | Acción concreta |

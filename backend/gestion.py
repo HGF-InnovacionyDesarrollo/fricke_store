@@ -490,7 +490,14 @@ def _guardar_modulo(m: Modulo, ctx: Contexto, mid: int | None):
     campos = m.model_dump(exclude={"roles"})
     for k in ("activo", "datos_sensibles", "eipd_aprobada"):
         campos[k] = int(campos[k])
+    # La evaluación de impacto (EIPD) la aprueba solo el Delegado de Protección de Datos: quien administra el portal
+    # no puede aprobarse a sí mismo un módulo con datos sensibles (separación de funciones, Ley 21.719).
+    es_dpd = ctx.u["rol"] == "dpd"
     with bd() as c:
+        if not es_dpd:
+            previo_eipd = c.execute("SELECT eipd_aprobada FROM modulos WHERE id=?", (mid,)).fetchone() if mid else None
+            campos["eipd_aprobada"] = previo_eipd["eipd_aprobada"] if previo_eipd else 0
+            m.eipd_aprobada = bool(campos["eipd_aprobada"])
         if mid is None:
             if c.execute("SELECT 1 FROM modulos WHERE clave=?", (m.clave,)).fetchone():
                 raise HTTPException(409, "Ya existe un módulo con esa clave.")
@@ -663,6 +670,14 @@ def alertas_seguridad(c) -> list[dict]:
                    "texto": "No hay respaldos registrados." if not r["ultimo"] else f"El último respaldo tiene más de {cfg.RESPALDO_MAX_HORAS} horas."})
     if not r["ultima_prueba"] or datetime.now(timezone.utc) - datetime.fromisoformat(r["ultima_prueba"]) > timedelta(days=92):
         al.append({"nivel": "media", "texto": "No se ha probado una restauración de respaldo en los últimos 3 meses."})
+    # Plazos de conservación (Ley 21.719): gestionar.py depurar debe correr a diario (docs/OPERACION.md).
+    from plataforma import REGISTRO
+    if any(m.depurar for m in REGISTRO.values()):
+        ultima = leer_ajuste("ultima_depuracion")
+        if not ultima or ahora_dt - datetime.fromisoformat(ultima) > timedelta(hours=cfg.RESPALDO_MAX_HORAS):
+            al.append({"nivel": "media", "texto": "No se están aplicando los plazos de conservación: "
+                       "programa «gestionar.py depurar» a diario (ver Operación)." if not ultima else
+                       f"La depuración por plazos de conservación no corre hace más de {cfg.RESPALDO_MAX_HORAS} horas."})
     return al
 
 
@@ -795,7 +810,9 @@ def contencion(accion: str, d: Confirmacion, ctx: Contexto = Depends(seguridad_o
     if accion not in ACCIONES_CONTENCION:
         raise HTTPException(404, "Acción no válida.")
     if not verificar_clave(d.clave, ctx.u["clave_hash"]):
-        auditar("contencion_rechazada", ctx.u["id"], f"{accion}: contraseña incorrecta", ctx.ip)
+        from app import MENSAJE_BLOQUEO, fallo_de_clave
+        if fallo_de_clave(ctx.u["id"], ctx.ip, "contencion_rechazada", f"{accion}: contraseña incorrecta"):
+            raise HTTPException(401, MENSAJE_BLOQUEO)
         raise HTTPException(401, "Contraseña incorrecta.")
     if len(d.motivo.strip()) < 5:
         raise HTTPException(400, "Indica el motivo (queda en la bitácora).")

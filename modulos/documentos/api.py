@@ -4,7 +4,7 @@
 - Carpetas, subir, reemplazar, eliminar y papelera: documentos.administrar (se otorga persona a persona).
 - Solo PDF, hasta 25 MB. El archivo viaja en base64 dentro del JSON (así usa el api() común, con su cabecera anti-CSRF).
 - Eliminar no borra: el documento va a la papelera. Reemplazar deja la versión anterior en la papelera.
-  depurar() borra lo que lleva más de 30 días ahí.
+  depurar() borra lo eliminado que lleva más de 30 días ahí y las versiones anteriores de más de 5 años.
 """
 import base64
 import binascii
@@ -24,6 +24,9 @@ router = APIRouter()
 VER = f"{CLAVE}.ver"
 ADMIN = f"{CLAVE}.administrar"
 DIAS_PAPELERA = 30
+# Las versiones reemplazadas son el historial del documento (qué versión estaba vigente en una fecha, para la
+# acreditación): se guardan 5 años. Decisión del 19 nov 2026.
+DIAS_HISTORIAL = 5 * 365 + 1
 MAX_BYTES = 25 * 1024 * 1024
 MAX_BASE64 = (MAX_BYTES + 2) // 3 * 4
 MAX_RESULTADOS = 50
@@ -300,7 +303,7 @@ def cambiar_documento(did: int, d: CambioDocumento, ctx: ContextoModulo = Depend
 
 @router.post("/documentos/{did}/version")
 def reemplazar(did: int, d: ArchivoPdf, ctx: ContextoModulo = Depends(acceso(CLAVE, ADMIN))):
-    """Sube un PDF nuevo para el documento. El anterior queda 30 días en la papelera y se puede restaurar."""
+    """Sube un PDF nuevo para el documento. El anterior queda 5 años en el historial y se puede restaurar."""
     datos, nombre, huella = _pdf(d)
     with bd_modulo(CLAVE) as c:
         _documento_activo(c, did)
@@ -325,7 +328,7 @@ def eliminar(did: int, ctx: ContextoModulo = Depends(acceso(CLAVE, ADMIN))):
 # ------------------------------------------------------------------ papelera (administrar)
 @router.get("/papelera")
 def papelera(ctx: ContextoModulo = Depends(acceso(CLAVE, ADMIN))):
-    """Documentos eliminados y versiones reemplazadas de los últimos 30 días, con los días que les quedan."""
+    """Documentos eliminados (30 días) y versiones anteriores (historial de 5 años), con los días que les quedan."""
     with bd_modulo(CLAVE) as c:
         carpetas = _carpetas(c)
         docs = [dict(f) for f in c.execute(
@@ -339,12 +342,12 @@ def papelera(ctx: ContextoModulo = Depends(acceso(CLAVE, ADMIN))):
                       GREATEST(0, ? - floor(extract(epoch FROM now() - v.reemplazada_en) / 86400))::int AS dias
                FROM versiones v JOIN documentos d ON d.id=v.documento_id
                WHERE v.reemplazada_en IS NOT NULL AND d.eliminado_en IS NULL ORDER BY v.reemplazada_en DESC""",
-            (DIAS_PAPELERA,))]
+            (DIAS_HISTORIAL,))]
     nombres = nombres_de({f["por"] for f in docs + vers})
     for f in docs + vers:
         f["por"] = nombres.get(f["por"], "—")
         f["ruta"] = _ruta(carpetas, f["carpeta_id"])
-    return {"documentos": docs, "versiones": vers, "dias_papelera": DIAS_PAPELERA}
+    return {"documentos": docs, "versiones": vers, "dias_papelera": DIAS_PAPELERA, "dias_historial": DIAS_HISTORIAL}
 
 
 @router.get("/papelera/documentos/{did}/archivo")
@@ -441,10 +444,10 @@ def exportar_titular(usuario_id: int) -> dict:
 
 
 def depurar() -> int:
-    """Vacía la papelera: borra lo eliminado y las versiones reemplazadas hace más de 30 días."""
+    """Vacía la papelera (lo eliminado hace más de 30 días) y el historial (versiones reemplazadas hace más de 5 años)."""
     with bd_modulo(CLAVE) as c:
         versiones = c.execute("DELETE FROM versiones WHERE reemplazada_en < now() - make_interval(days => ?)",
-                              (DIAS_PAPELERA,)).rowcount
+                              (DIAS_HISTORIAL,)).rowcount
         documentos = c.execute("DELETE FROM documentos WHERE eliminado_en < now() - make_interval(days => ?)",
                                (DIAS_PAPELERA,)).rowcount
     return versiones + documentos

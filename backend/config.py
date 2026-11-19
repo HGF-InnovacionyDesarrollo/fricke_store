@@ -42,6 +42,8 @@ COOKIE_NOMBRE = f"eco_sesion_{ESTABLECIMIENTO}"  # una por establecimiento: no s
 # Intentos de acceso
 MAX_INTENTOS = int(os.environ.get("ECO_MAX_INTENTOS", 5))
 BLOQUEO_MIN = int(os.environ.get("ECO_BLOQUEO_MIN", 15))
+# Fallos de ingreso desde una misma IP (contra cualquier cuenta) antes de rechazar por VENTANA_PUBLICO_MIN minutos
+MAX_FALLOS_IP = int(os.environ.get("ECO_MAX_FALLOS_IP", 20))
 
 # Solicitudes públicas (crear cuenta, recuperar clave): máximo por IP en la ventana indicada
 LIMITE_PUBLICO = int(os.environ.get("ECO_LIMITE_PUBLICO", 5))

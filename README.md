@@ -92,7 +92,7 @@ python backend/gestionar.py modulos                                             
 
 Al reiniciar el portal el módulo se registra solo, **inactivo**. Se publica en **Administración › Módulos** eligiendo quién lo ve.
 Si trata datos de salud, no aparecerá hasta que el DPD apruebe la evaluación de impacto.
-El ejemplo de referencia es `modulos/ejemplo/` (Tablón de avisos).
+El ejemplo de referencia es `modulos/ejemplo/` (F+avisos, un tablón de avisos).
 
 También se pueden registrar enlaces a sistemas externos desde **Administración › Módulos › Agregar módulo**, con su ficha de tratamiento.
 

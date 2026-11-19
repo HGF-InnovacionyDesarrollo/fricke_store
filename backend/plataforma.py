@@ -29,7 +29,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import config as cfg
-from db import ahora, aplicar_migraciones, auditar, bd
+from db import ahora, aplicar_migraciones, auditar, bd, guardar_ajuste
 from establecimiento import textos
 from logo_modulo import FAMILIAS, problemas_nombre, slug, verificar as verificar_logo
 
@@ -497,12 +497,23 @@ def exportar_titular(usuario_id: int) -> dict:
 def depurar_todos() -> dict[str, int]:
     """Aplica el plazo de conservación de cada módulo (programar a diario junto con el respaldo)."""
     resultado = {}
+    fallas = []
     for clave, mod in REGISTRO.items():
         if mod.depurar:
-            n = mod.depurar()
+            try:
+                n = mod.depurar()
+            except Exception as e:  # noqa: BLE001  (un módulo con error no impide depurar los demás)
+                fallas.append(clave)
+                print(f"[depurar] '{clave}' falló: {type(e).__name__}: {e}", file=sys.stderr)
+                continue
             resultado[clave] = n
             if n:
                 auditar("modulo_depurado", None, f"{clave}: {n} registros eliminados por plazo de conservación")
+    if fallas:
+        auditar("depuracion_fallida", None, "módulos: " + ", ".join(fallas))
+    else:
+        # El panel avisa si esto no se ejecuta a diario (los plazos de conservación no se cumplen solos).
+        guardar_ajuste("ultima_depuracion", ahora())
     return resultado
 
 

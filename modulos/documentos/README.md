@@ -12,12 +12,12 @@ de Lucide.
 |---|---|
 | Documentos | Carpetas y subcarpetas con migas de pan. Cada PDF se abre en una pestaña nueva o se descarga. |
 | Buscar | Busca en título, descripción, nombre del archivo y carpetas, sin importar tildes ni mayúsculas. Dirección `/m/documentos/buscar?q=…`. A esta pantalla lleva el botón **Buscar un documento** de la pantalla de inicio del portal. |
-| Papelera | Documentos eliminados y versiones reemplazadas de los últimos 30 días: abrir, restaurar o eliminar para siempre. |
+| Papelera | Documentos eliminados de los últimos 30 días y el historial de versiones reemplazadas (5 años): abrir, restaurar o eliminar para siempre. |
 | Acerca del módulo | Qué hace, quién lo administra y la ficha de tratamiento. |
 
 - **Solo PDF**, hasta 25 MB cada uno. Se guardan en la base del módulo (`m_documentos.versiones`), así que entran en
   los respaldos del portal sin hacer nada extra.
-- **Reemplazar** un PDF deja la versión anterior 30 días en la papelera; se puede restaurar.
+- **Reemplazar** un PDF deja la versión anterior 5 años en el historial (para saber qué versión estaba vigente en cada fecha, como pide la acreditación); se puede restaurar.
 - **Eliminar** un documento lo manda a la papelera 30 días. `depurar()` (que corre con `gestionar.py depurar`) la vacía.
 - **Carpetas**: solo se eliminan vacías (no pasan por la papelera). Si un documento de la papelera estaba en una carpeta
   que ya no existe, al restaurarlo vuelve al inicio.
@@ -40,7 +40,7 @@ python backend/gestionar.py permiso --rut 12.345.678-5 --permiso documentos.admi
 
 Solo guarda el id interno de quien crea carpetas y sube, cambia o elimina documentos, con la fecha. Los documentos son
 institucionales: al subir se muestra el aviso de no subir documentos con datos de pacientes ni de otras personas.
-`exportar_titular` entrega lo que la persona hizo (sin los PDF) y `depurar` vacía la papelera a los 30 días.
+`exportar_titular` entrega lo que la persona hizo (sin los PDF) y `depurar` vacía la papelera a los 30 días y el historial de versiones a los 5 años.
 En la bitácora queda la acción con el número de documento o carpeta, nunca el título ni el contenido.
 
 ## Cómo probarlo

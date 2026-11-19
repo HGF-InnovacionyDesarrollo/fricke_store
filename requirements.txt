@@ -1,9 +1,11 @@
-fastapi>=0.110
-uvicorn>=0.29
-cryptography>=42
-psycopg[binary]>=3.2
-psycopg_pool>=3.2
-qrcode>=7.4
+# Versiones fijas: una actualización de una librería no entra sola (se sube aquí, en un pull request, con las pruebas).
+# La revisión automática revisa además vulnerabilidades conocidas (pip-audit, .github/workflows/revision.yml).
+fastapi==0.165.0
+uvicorn==0.54.0
+cryptography==50.0.1
+psycopg[binary]==3.3.9
+psycopg_pool==3.3.3
+qrcode==8.2
 # Solo para generar íconos de módulo (backend/logo_modulo.py)
-fonttools>=4.50
-brotli>=1.1
+fonttools==4.68.0
+brotli==1.2.1
