@@ -691,7 +691,13 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
       await conMonitor("Guardando el WiFi y conectando", async () => {
         await usb.ponerWifi(red, clave, servidor);
         await registrar("wifi");
-        await new Promise((r) => setTimeout(r, 8000));   // tiempo para que se conecte antes de volver a leer
+        // El monitor tarda entre 10 y 30 s en reconectarse: se consulta cada 3 s (hasta 45 s) antes de decir que falló.
+        const estado = document.getElementById("usb-estado");
+        for (let t = 0; t < 45; t += 3) {
+          if (estado) estado.textContent = `Conectando a ${red}… (${t} s)`;
+          await new Promise((r) => setTimeout(r, 3000));
+          try { if ((await usb.wifi())?.conectado) break; } catch (_) { /* el monitor aún se está reiniciando */ }
+        }
       });
     };
     document.getElementById("u-wifi-fdata").onclick = async () => {
