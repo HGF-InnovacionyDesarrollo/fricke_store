@@ -6,6 +6,9 @@
   font: inherit; font-size: 14px; line-height: 20px; color: var(--texto); cursor: pointer; border-color: var(--peligro); }
 .aviso-alarmas .linea { color: var(--peligro); flex: none; }
 .aviso-alarmas:hover { background: var(--hover); }
+.aviso-sd { display: flex; gap: 12px; align-items: flex-start; max-width: 960px; margin: 0 0 12px; font-size: 14px; line-height: 20px;
+  border-color: var(--peligro); }
+.aviso-sd .linea { color: var(--peligro); flex: none; }
 .grupo-equipo { margin: 0 0 24px; }
 .cab-equipo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .grilla-sensores { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }

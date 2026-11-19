@@ -285,3 +285,26 @@ def test_envio_wifi_no_se_adueña_de_sensores_de_otro_equipo_activo(personas):
     assert r.status_code == 200 and r.json()["lecturas_nuevas"] == 0
     dueño = next(e["codigo"] for e in tc.get(f"{API}/sensores").json()["equipos"] for s in e["sensores"] if s["ieee"] == ieee)
     assert dueño == "MTH-88"
+
+
+def test_envio_wifi_informa_que_la_sd_no_graba(personas):
+    """Firmware 2.2: el equipo cuenta en cada envío si su SD graba; F+data lo muestra sin esperar la importación."""
+    admin, _ = personas
+    tc = cliente(admin)
+    secreto = tc.post(f"{API}/envio-wifi", json={"equipo": "MTH-87"}).json()["secreto"]
+    equipo = TestClient(portal.app)
+    ieee = "A4C13880C7478787"
+    sin_sd = {**envio("MTH-87", ieee=ieee), "sd": 0, "sd_fuera_s": 900, "pendientes": 12}
+    assert equipo.post(f"{API}/equipo", json=sin_sd, auth=("equipo", secreto)).status_code == 200
+    eq = next(e for e in tc.get(f"{API}/resumen").json()["equipos"] if e["codigo"] == "MTH-87")
+    assert eq["wifi"]["sd"]["ok"] is False and eq["wifi"]["sd"]["pendientes"] == 12 and eq["wifi"]["sd"]["fuera_desde"]
+    # Vuelve a grabar
+    con_sd = {**envio("MTH-87", ieee=ieee, edad=1), "sd": 1, "sd_fuera_s": 0, "pendientes": 0}
+    equipo.post(f"{API}/equipo", json=con_sd, auth=("equipo", secreto))
+    eq = next(e for e in tc.get(f"{API}/resumen").json()["equipos"] if e["codigo"] == "MTH-87")
+    assert eq["wifi"]["sd"]["ok"] is True and eq["wifi"]["sd"]["fuera_desde"] is None
+    # Un equipo con firmware anterior (sin el campo) no muestra aviso
+    secreto2 = tc.post(f"{API}/envio-wifi", json={"equipo": "MTH-86"}).json()["secreto"]
+    equipo.post(f"{API}/equipo", json=envio("MTH-86", ieee="A4C13880C7478686"), auth=("equipo", secreto2))
+    eq = next(e for e in tc.get(f"{API}/resumen").json()["equipos"] if e["codigo"] == "MTH-86")
+    assert eq["wifi"]["sd"] is None

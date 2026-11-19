@@ -36,7 +36,7 @@
 #include "logo_pantalla.h"      // LOGO_PANTALLA_170: F+data + "Funciona con" Fricke Store (1,9")
 #include "logo_pantalla_240.h"  // LOGO_PANTALLA_240 (pantalla 2,4")
 
-#define VERSION_FIRMWARE "2.1"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
+#define VERSION_FIRMWARE "2.2"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
 #define LARGO_LINEA  200  // largo máximo de una fila de registro (incluida la firma)
 #define COLA_EVENTOS 24   // eventos en espera de escribirse
 
@@ -1074,6 +1074,13 @@ static void wifiAplicar(bool alArrancar) {
   registrarEvento("WIFI_ENCENDIDO", "red %s, servidor %s", red.c_str(), servidor.length() ? servidor.c_str() : "ninguno");
 }
 
+// Estado de la SD para el envío WiFi (firmware 2.2). Lo actualiza revisarAlertaSD() en el loop y lo lee la tarea
+// del WiFi: así el portal avisa que la SD no graba sin esperar a que alguien la importe (variables de 32 bits:
+// se leen y escriben de una vez en el ESP32, sin candado).
+static volatile uint32_t envioSdOk = 1;          // 1 = la SD está grabando; 0 = no (falta, falla o se retiró)
+static volatile uint32_t envioSdFueraS = 0;      // segundos que lleva sin grabar
+static volatile uint32_t envioPendientes = 0;    // filas firmadas esperando en la flash
+
 static void tareaWiFi(void *) {
   uint32_t seq = 0;
   for (;;) {
@@ -1111,6 +1118,12 @@ static void tareaWiFi(void *) {
     j += wifiOk;
     j += ",\"envios_falla\":";
     j += wifiFallas;
+    j += ",\"sd\":";
+    j += (unsigned long)envioSdOk;
+    j += ",\"sd_fuera_s\":";
+    j += (unsigned long)envioSdFueraS;
+    j += ",\"pendientes\":";
+    j += (unsigned long)envioPendientes;
     j += ",\"sensores\":[";
     bool primero = true;
     for (int i = 0; i < MAX_SENSORES; i++) {
@@ -2604,15 +2617,20 @@ static void sonarAlarma() {
 // Lleva la cuenta de cuánto tiempo la SD no graba y registra la alerta una vez.
 static void revisarAlertaSD() {
   static bool registrada = false;
+  envioPendientes = filasPendientes;
   if (sdOk) {
     sdFueraDesdeMs = 0;
     registrada = false;
+    envioSdOk = 1;
+    envioSdFueraS = 0;
     return;
   }
   if (!sdFueraDesdeMs) {
     sdFueraDesdeMs = millis() ? millis() : 1;
     sdFueraDesde = horaValida() ? time(nullptr) : 0;
   }
+  envioSdOk = 0;
+  envioSdFueraS = (millis() - sdFueraDesdeMs) / 1000;
   if (!registrada && alertaSDActiva()) {
     registrada = true;
     registrarEvento("SD_FALLA_PROLONGADA", "%s hace %d min, %lu filas esperando en la flash",
