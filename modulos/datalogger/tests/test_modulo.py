@@ -227,6 +227,21 @@ def test_envio_wifi_con_credencial_de_equipo(personas):
     assert equipo.post(f"{API}/equipo", json=envio(), auth=("equipo", secreto)).status_code == 401
 
 
+def test_envio_wifi_tolera_valores_raros_de_un_sensor(personas):
+    """Un valor fuera de rango (por ejemplo batería en escala 0-200) no debe hacer rechazar todo el envío."""
+    admin, _ = personas
+    secreto = cliente(admin).post(f"{API}/envio-wifi", json={"equipo": "MTH-98"}).json()["secreto"]
+    d = envio("MTH-98", ieee="A4C13880C7479598")
+    d["sensores"][0]["bat"] = 200
+    d["sensores"][0]["edad_s"] = 12.0
+    d["rssi"] = 5
+    r = TestClient(portal.app).post(f"{API}/equipo", json=d, auth=("equipo", secreto))
+    assert r.status_code == 200 and r.json()["lecturas_nuevas"] == 1
+    # Un formato realmente inválido sí se rechaza
+    d["monitor"] = "mal nombre!"
+    assert TestClient(portal.app).post(f"{API}/equipo", json=d, auth=("equipo", secreto)).status_code == 422
+
+
 def test_envio_wifi_con_sesion_sigue_exigiendo_cabecera_anti_csrf(personas):
     admin, _ = personas
     secreto = cliente(admin).post(f"{API}/envio-wifi", json={"equipo": "MTH-97"}).json()["secreto"]
