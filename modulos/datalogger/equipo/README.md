@@ -97,8 +97,13 @@ instalarla (`config_inicial.h`, por número de serie).
 3. Herramientas:
    - Placa: **ESP32C6 Dev Module**
    - Zigbee mode: **Zigbee ZCZR (coordinator/router)**
-   - Flash Size: **8MB**
-   - Partition Scheme: **Zigbee ZCZR 8MB with spiffs** (la red Zigbee ya está guardada en la posición de esta partición)
+   - Flash Size: **4MB**, también en las placas de 8 MB (desde el firmware 2.5 hay una sola versión).
+   - Partition Scheme: **Custom**. La división de la memoria está en `partitions.csv`, junto al
+     `.ino`, y Arduino la usa sola: una app de 2,5 MB y la red Zigbee en `0x3EA000`. "Custom" solo
+     evita que Arduino rechace el programa por tamaño (el tope real es 2,5 MB).
+   - **Ojo:** grabar desde Arduino en una placa que todavía tiene la división antigua de 8 MB
+     (MTH-01, MTH-02) borra en la práctica su red Zigbee sin avisar. Para esas placas usar el
+     Configurador, que pide confirmación y deja la memoria en orden (ver `configurador/LEEME.md`).
    - Core Debug Level: **Info** (para ver en el monitor serie cuando se une un dispositivo)
    - Si conectas por el puerto USB nativo de la placa: USB CDC On Boot: **Enabled**
 4. Monitor serie a **115200**.

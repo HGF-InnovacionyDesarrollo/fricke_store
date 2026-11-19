@@ -8,6 +8,8 @@ build/
 
 # Registros sacados de la SD
 *.csv
+# ...salvo la división de la memoria del firmware (antes este *.csv la dejaba fuera del repositorio)
+!/partitions.csv
 
 # Archivos temporales de Word
 ~$*

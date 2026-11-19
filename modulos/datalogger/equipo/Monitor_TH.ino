@@ -4,8 +4,8 @@
 // Configuración en Arduino IDE (Herramientas):
 //   Placa:           ESP32C6 Dev Module
 //   Zigbee mode:     Zigbee ZCZR (coordinator/router)
-//   Flash Size:      8MB
-//   Partition Scheme: Zigbee ZCZR 8MB with spiffs
+//   Flash Size:      4MB (también en placas de 8 MB: una sola versión desde el firmware 2.5)
+//   Partition Scheme: Custom (la división está en partitions.csv, junto a este archivo)
 //   USB CDC On Boot: Enabled
 //   Core Debug Level: Info (muestra en serie cuando se une un dispositivo)
 

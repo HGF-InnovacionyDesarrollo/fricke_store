@@ -6,8 +6,9 @@ datos (data logger) para un entorno clínico. Detalles de uso y conexiones en el
 
 ## Hardware en uso
 
-- ESP32-C6 DevKit (8 MB flash) como coordinador Zigbee — **su WiFi no recibe señal**
-  (0 redes en escaneo), por eso el WiFi se eliminó del firmware.
+- ESP32-C6 DevKit (4 u 8 MB de flash) como coordinador Zigbee. Desde el firmware 2.1 el
+  WiFi es opcional y envía las lecturas a F+data (en el primer DevKit la antena no recibía
+  señal; MTH-03 envía bien).
 - Pantalla ST7789 1,9" 170×320, micro SD SPI 3,3 V, reloj DS3231, pulsador (GPIO 23).
 - 3 sensores UZ-5T (Tuya TS0201 `_TZ3000_bgsigers`), todos emparejados.
 - Montaje actual en protoboard: **las conexiones se sueltan al mover la placa**
@@ -19,11 +20,12 @@ datos (data logger) para un entorno clínico. Detalles de uso y conexiones en el
 |---|---|---|---|---|---|
 | MTH-01 | 98A316FFFE9BB2EC | 8 MB | 1,9" | 1.3 | Actualizar a 2.0 con el Configurador |
 | MTH-02 | 98A316FFFE9BB340 | 8 MB | 2,4" | 2.0 | Sensor 00E4: confirmar nombre y área |
-| MTH-03 | E8F60AFFFEF7EE48 | **4 MB** | 2,4" | 2.0 | Armado 2026-11-10: venía con firmware de fábrica; se borró la memoria y se instaló la 2.0 de 4 MB. Código y hora puestos (el DS3231 venía sin hora); SD y reloj OK, pantalla 2,4" se ve bien. Micro SD de 3,3 V (pin "3V3"). **Falta emparejar sensores**, nombrarlos y guardar el respaldo de configuración |
+| MTH-03 | E8F60AFFFEF7EE48 | **4 MB** | 2,4" | 2.5 | Armado 2026-11-10. 2026-11-19: firmware 2.5 grabado (ya con la división única de `partitions.csv`), 2 sensores emparejados, WiFi a F+data funcionando. Sin divisor de energía: se usó `ENERGIA OFF` |
 
-Hay placas ESP32-C6 con flash de 4 MB: el Configurador lee la flash e instala la
-compilación que corresponde (`configurador/firmware/8MB` o `4MB`). En 4 MB el
-programa ocupa el 98 % de su partición (1,25 MB).
+Desde el firmware 2.5 hay **una sola versión** para placas de 4 y 8 MB, con la división de
+`partitions.csv` (app de 2,5 MB; el 2.5 ocupa el 79 %). MTH-01 y MTH-02 todavía tienen la
+división antigua de 8 MB: al actualizarlos con el Configurador se pide confirmar el cambio y
+hay que volver a emparejar sus sensores (una sola vez; la configuración se conserva).
 
 ## Funciones implementadas
 
@@ -130,12 +132,11 @@ menos.
 Arduino IDE o arduino-cli con el core esp32 3.3.11 y "GFX Library for Arduino" 1.6.7:
 
 ```
-arduino-cli compile --fqbn "esp32:esp32:esp32c6:FlashSize=8M,PartitionScheme=zigbee_zczr_8MB,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc" Monitor_TH
-arduino-cli upload -p COM10 --fqbn "<mismo fqbn>" Monitor_TH
+arduino-cli compile --fqbn "esp32:esp32:esp32c6:FlashSize=4M,PartitionScheme=custom,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc" --build-property upload.maximum_size=2621440 Monitor_TH
+arduino-cli upload -p COM17 --fqbn "<mismo fqbn>" Monitor_TH
 ```
 
-No cambiar el esquema de particiones: la red Zigbee está guardada en `0x7EA000`.
-
-Placas de 4 MB (MTH-03): `FlashSize=4M,PartitionScheme=zigbee_zczr` (resto del FQBN
-igual; red Zigbee en `0x3EA000`). Desde el firmware 2.0 lo normal es instalar con el
-Configurador, que elige la compilación solo.
+(`Monitor_TH` es una copia de `equipo/`: arduino-cli exige que la carpeta se llame como el `.ino`.)
+La división de la memoria está en `partitions.csv` (red Zigbee en `0x3EA000`); no cambiarla.
+Lo normal es instalar con el Configurador, que además cambia con cuidado la división de las
+placas que tenían la antigua de 8 MB.

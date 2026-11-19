@@ -1,12 +1,12 @@
 """Copia el firmware compilado a configurador/firmware/ para incluirlo en el .exe.
 
-Se incluyen dos compilaciones del mismo código, una por tamaño de flash de la placa
-(el Configurador detecta la flash e instala la que corresponde):
+Desde el firmware 2.5 hay una sola compilación para todas las placas (4 y 8 MB), con la
+división de memoria de ../partitions.csv (una sola app de 2,5 MB). Se compila con:
 
-  firmware/8MB/  FQBN esp32:esp32:esp32c6:FlashSize=8M,PartitionScheme=zigbee_zczr_8MB,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc
-  firmware/4MB/  FQBN esp32:esp32:esp32c6:FlashSize=4M,PartitionScheme=zigbee_zczr,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc
+  arduino-cli compile --fqbn esp32:esp32:esp32c6:FlashSize=4M,PartitionScheme=custom,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc ^
+      --build-property upload.maximum_size=2621440 --build-path <carpeta> <carpeta del sketch llamada Monitor_TH>
 
-Uso:  python preparar_firmware.py <compilación 8 MB> <compilación 4 MB>
+Uso:  python preparar_firmware.py <carpeta de compilación>
 """
 import hashlib
 import os
@@ -16,7 +16,8 @@ import sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 DESTINO = os.path.join(AQUI, "firmware")
-ARCHIVOS = {  # en la carpeta de compilación -> nombre en firmware/<tamaño>/
+TOPE_APP = 0x280000  # tamaño de app0 en ../partitions.csv
+ARCHIVOS = {  # en la carpeta de compilación -> nombre en firmware/
     "Monitor_TH.ino.bootloader.bin": "bootloader.bin",
     "Monitor_TH.ino.partitions.bin": "partitions.bin",
     "boot_app0.bin": "boot_app0.bin",
@@ -25,35 +26,34 @@ ARCHIVOS = {  # en la carpeta de compilación -> nombre en firmware/<tamaño>/
 
 
 def main() -> int:
-    origenes = dict(zip(("8MB", "4MB"), sys.argv[1:3]))
-    if len(origenes) != 2:
+    if len(sys.argv) != 2:
         print(__doc__)
         return 1
-    for tam, origen in origenes.items():
-        faltan = [a for a in ARCHIVOS if not os.path.isfile(os.path.join(origen, a))]
-        if faltan:
-            print(f"Faltan en '{origen}' ({tam}): {', '.join(faltan)}")
-            return 1
+    origen = sys.argv[1]
+    faltan = [a for a in ARCHIVOS if not os.path.isfile(os.path.join(origen, a))]
+    if faltan:
+        print(f"Faltan en '{origen}': {', '.join(faltan)}")
+        return 1
+    tam = os.path.getsize(os.path.join(origen, "Monitor_TH.ino.bin"))
+    if tam > TOPE_APP:
+        print(f"El programa pesa {tam} bytes y no cabe en la partición de {TOPE_APP} bytes.")
+        return 1
     with open(os.path.join(AQUI, "..", "Monitor_TH.ino"), encoding="utf-8") as f:
         version = re.search(r'#define VERSION_FIRMWARE "([^"]+)"', f.read()).group(1)
+    os.makedirs(DESTINO, exist_ok=True)
+    # carpetas de cuando había una compilación por tamaño de flash (8MB/ y 4MB/)
+    for viejo in ("8MB", "4MB"):
+        shutil.rmtree(os.path.join(DESTINO, viejo), ignore_errors=True)
     sumas = []
-    for tam, origen in origenes.items():
-        carpeta = os.path.join(DESTINO, tam)
-        os.makedirs(carpeta, exist_ok=True)
-        for a, b in ARCHIVOS.items():
-            shutil.copyfile(os.path.join(origen, a), os.path.join(carpeta, b))
-            with open(os.path.join(carpeta, b), "rb") as f:
-                sumas.append(f"{hashlib.sha256(f.read()).hexdigest()}  {tam}/{b}")
-    # binarios sueltos de cuando había una sola compilación
-    for b in ARCHIVOS.values():
-        viejo = os.path.join(DESTINO, b)
-        if os.path.isfile(viejo):
-            os.remove(viejo)
+    for a, b in ARCHIVOS.items():
+        shutil.copyfile(os.path.join(origen, a), os.path.join(DESTINO, b))
+        with open(os.path.join(DESTINO, b), "rb") as f:
+            sumas.append(f"{hashlib.sha256(f.read()).hexdigest()}  {b}")
     with open(os.path.join(DESTINO, "version.txt"), "w", encoding="utf-8") as f:
         f.write(version + "\n")
     with open(os.path.join(DESTINO, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(sumas) + "\n")
-    print(f"Firmware {version} (8 MB y 4 MB) copiado a {DESTINO}")
+    print(f"Firmware {version} copiado a {DESTINO} ({tam} bytes, {100 * tam // TOPE_APP} % de la partición)")
     return 0
 
 

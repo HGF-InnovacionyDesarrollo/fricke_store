@@ -16,7 +16,7 @@ copia al PC y se abre (no requiere instalar nada).
 | Equipo | Ver código, serie, versión, hora, SD y respaldo de energía. Poner la hora del PC, abrir la red para emparejar sensores, reiniciar. |
 | Configuración | Código del equipo (MTH-01, MTH-02...), modelo de pantalla (1,9" o 2,4"), qué alarmas suenan y el WiFi opcional (red, clave y servidor al que se envían las lecturas cada minuto). |
 | Sensores | Lista de sensores con sus valores. Doble clic para ponerles nombre, área (Medicamentos o Material estéril), corrección de calibración y fecha, u ocultarlos. |
-| Firmware | Instalar el firmware incluido (elige solo la versión para placas de 8 MB o de 4 MB). Conserva la clave de firma, los sensores emparejados, la red y la configuración. "Equipo nuevo: borrar toda la memoria" solo para placas nuevas. |
+| Firmware | Instalar el firmware incluido (una sola versión para todas las placas). Conserva la clave de firma, los sensores emparejados, la red y la configuración (en una placa con la división antigua de 8 MB, pide confirmar y hay que volver a emparejar los sensores, una sola vez). "Equipo nuevo: borrar toda la memoria" solo para placas nuevas. |
 | Registro | Últimos eventos del monitor, guardar o cargar la configuración en un archivo (respaldo o para clonar a otro equipo), exportar la clave de firma. |
 
 Todo cambio queda registrado como evento en el registro firmado del monitor.
@@ -34,22 +34,28 @@ Todo cambio queda registrado como evento en el registro firmado del monitor.
 
 Cuando cambia el firmware (`Monitor_TH.ino`):
 
-1. Compilar con Arduino **dos veces**, cada una en su carpeta (`--build-path` en
-   arduino-cli), porque hay placas ESP32-C6 con flash de 8 MB y de 4 MB:
-   - 8 MB: `esp32:esp32:esp32c6:FlashSize=8M,PartitionScheme=zigbee_zczr_8MB,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc`
-   - 4 MB: `esp32:esp32:esp32c6:FlashSize=4M,PartitionScheme=zigbee_zczr,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc`
-     con `--build-property upload.maximum_size=2621440`, compilando **una copia** del sketch
-     que tenga `herramientas/particiones_4MB.csv` renombrado como `partitions.csv` (una sola
-     app de 2,5 MB, sin OTA; lo demás en las mismas direcciones). No dejar `partitions.csv`
-     en la carpeta del repositorio: Arduino lo usaría también para 8 MB y movería la red Zigbee.
-2. `construir.bat <compilación 8 MB> <compilación 4 MB>`: copia los binarios a
-   `firmware/8MB/` y `firmware/4MB/` y arma
-   `dist\Monitor TH Hospital Dr. Gustavo Fricke.exe` con PyInstaller.
+1. Compilar **una sola vez** (desde el firmware 2.5 hay una sola versión para placas de 4 y
+   de 8 MB). La división de la memoria está en `../partitions.csv`, en la carpeta del sketch:
+   Arduino la usa sola. arduino-cli exige que la carpeta se llame como el `.ino`, así que se
+   compila una copia de `equipo/` llamada `Monitor_TH`:
+   ```
+   arduino-cli compile --fqbn esp32:esp32:esp32c6:FlashSize=4M,PartitionScheme=custom,ZigbeeMode=zczr,DebugLevel=info,CDCOnBoot=cdc ^
+       --build-property upload.maximum_size=2621440 --build-path <carpeta de compilación> <copia Monitor_TH>
+   ```
+   El tope de 2,5 MB (`upload.maximum_size`) es el tamaño del programa en `partitions.csv`:
+   sin él Arduino no avisa si el firmware crece de más.
+2. `construir.bat <carpeta de compilación>`: copia los binarios a `firmware/` (revisa que el
+   programa quepa) y arma `dist\Monitor TH Hospital Dr. Gustavo Fricke.exe` con PyInstaller.
 
-Al instalar, el aplicativo lee el tamaño de la flash de la placa y usa la compilación
-que corresponde (con 16 MB usa la de 8 MB; con menos de 4 MB no instala). En la de
-4 MB el programa (con WiFi, ~2,1 MB) usa la partición única de 2,5 MB de
-`herramientas/particiones_4MB.csv`.
+Al instalar, el aplicativo revisa la división de la memoria que tiene la placa:
+
+- Igual a la de `partitions.csv`, en blanco, o la antigua "Zigbee ZCZR 4MB" (mismas direcciones
+  de datos): instala sin borrar nada.
+- La antigua de 8 MB (MTH-01, MTH-02): antes de instalar pide confirmar el cambio, que se hace
+  una sola vez por equipo. Se conservan la configuración, los sensores (nombres y
+  correcciones), el WiFi y la clave de firma (NVS en `0x9000`, igual en las dos). Se borran la
+  red Zigbee (hay que volver a emparejar los sensores) y el respaldo interno (confirmar antes
+  que la pantalla no diga "pend. SD").
 
 Requiere Python 3 con `pip install pyserial esptool pyinstaller`.
 
