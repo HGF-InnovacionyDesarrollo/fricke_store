@@ -36,7 +36,7 @@
 #include "logo_pantalla.h"      // LOGO_PANTALLA_170: F+data + "Funciona con" Fricke Store (1,9")
 #include "logo_pantalla_240.h"  // LOGO_PANTALLA_240 (pantalla 2,4")
 
-#define VERSION_FIRMWARE "2.2"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
+#define VERSION_FIRMWARE "2.3"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
 #define LARGO_LINEA  200  // largo máximo de una fila de registro (incluida la firma)
 #define COLA_EVENTOS 24   // eventos en espera de escribirse
 
@@ -2128,9 +2128,9 @@ static void dibujarBateria(int xDer, int y, const Sensor &s) {
   textoDerecha(x - 3, y + 1, buf, 1, c == C_NORMAL ? C_TENUE : c);
 }
 
-// La alarma solo cuenta si el dato es reciente.
-// Una alarma sigue activa hasta que llegue una lectura dentro del rango, aunque el
-// sensor deje de reportar: un sensor en alarma que se queda mudo no se da por resuelto.
+// Una alarma sigue activa hasta que llegue una lectura dentro del rango. Si el sensor deja
+// de reportar más de SIN_DATOS_MIN, revisarAvisosTecnicos() la cierra en silencio (firmware
+// 2.3): el sensor queda marcado "sin datos" en pantalla, como cualquier sensor mudo.
 static bool alarmaActiva(const Sensor &s) {
   return s.enAlarma || s.enAlarmaHum;
 }
@@ -2656,6 +2656,19 @@ static void revisarAvisosTecnicos() {
     if (sd != s.avisoSinDatos) {
       if (sd) registrarEvento("SENSOR_SIN_DATOS", "%s: sin reportar hace mas de %d min", nombre, SIN_DATOS_MIN);
       else registrarEvento("SENSOR_RECUPERADO", "%s: volvio a reportar", nombre);
+    }
+    // Sensor en alarma que se quedó mudo: la alarma se cierra en silencio, con su evento de fin.
+    // Si vuelve a reportar fuera de rango, evaluarAlarma() la abre de nuevo.
+    if (sd && (s.enAlarma || s.enAlarmaHum)) {
+      portENTER_CRITICAL(&mux);
+      sensores[i].enAlarma = false;
+      sensores[i].enAlarmaHum = false;
+      portEXIT_CRITICAL(&mux);
+      alarmaCambio = true;
+      if (s.enAlarma)
+        registrarEvento("ALARMA_TEMP_FIN", "%s: sin datos hace mas de %d min, alarma cerrada", nombre, SIN_DATOS_MIN);
+      if (s.enAlarmaHum)
+        registrarEvento("ALARMA_HUM_FIN", "%s: sin datos hace mas de %d min, alarma cerrada", nombre, SIN_DATOS_MIN);
     }
     // Batería: se avisa bajo BATERIA_BAJA y se da por recuperada 5 puntos más arriba.
     bool bb = s.avisoBatBaja ? (s.tieneBat && s.bat < BATERIA_BAJA + 5) : bateriaBaja(s);

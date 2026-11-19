@@ -323,10 +323,12 @@ El procedimiento está en `docs/Instructivo_calibracion_sensores_Monitor_TH.docx
 - Los sensores reportan cada cambio de ~0,5 °C o ~5 % (como máximo uno cada 5 min)
   y, sin cambios, al menos cada 30 min (`REPORTE_MAX_S`); la alarma puede tardar
   hasta 5 min en activarse.
-- Una alarma sigue activa hasta que llega una lectura dentro del rango, aunque el
-  sensor deje de reportar (y tras un reinicio): la vista de alarma muestra entonces
-  el último valor con "SIN DATOS", la hora del último dato y desde cuándo hay alarma.
-  Un sensor en alarma que se queda mudo no se da por resuelto.
+- Una alarma sigue activa hasta que llega una lectura dentro del rango. Si el sensor
+  deja de reportar más de `SIN_DATOS_MIN` (75 min; también tras un reinicio), la alarma
+  se cierra en silencio con su evento de fin ("sin datos hace mas de 75 min, alarma
+  cerrada") y el sensor queda como "! Sensor N sin datos" en la barra inferior, sin
+  sonido. Si vuelve a reportar fuera de rango, la alarma se abre de nuevo (firmware 2.3;
+  antes la alarma sonaba sin fin).
 - Cada alarma queda en el registro de eventos (`ALARMA_TEMP`, `ALARMA_TEMP_FIN`,
   `ALARMA_HUM`, `ALARMA_HUM_FIN`).
 
