@@ -31,8 +31,14 @@
   document.getElementById("form-chat").onsubmit = (e) => {
     e.preventDefault(); const i = document.getElementById("pregunta-chat"); preguntar(i.value); i.value = "";
   };
-  document.querySelectorAll(".sugerencia").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("button.sugerencia").forEach((b) => b.addEventListener("click", () => {
     const i = document.getElementById("pregunta"); i.value = b.dataset.texto; i.focus();
   }));
   document.getElementById("pregunta").focus();
+
+  // ---------- "Buscar un documento": abre el buscador de F+docs, solo si la persona tiene ese módulo habilitado
+  try {
+    const mods = await api("/api/modulos");
+    if (mods.some((m) => m.clave === "documentos")) document.getElementById("buscar-documento").classList.remove("oculto");
+  } catch (_) { /* sin el botón: el resto de la portada sigue igual */ }
 })();
