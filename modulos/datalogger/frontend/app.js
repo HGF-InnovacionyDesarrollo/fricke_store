@@ -649,7 +649,7 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         <p class="estado-wifi ${tonoWifi ? `tono-${tonoWifi}` : ""}">${esc(estadoWifi)}</p>
         ${wifi === null ? "" : `<div class="campo"><input id="u-red" placeholder=" " maxlength="32" value="${esc(wifi.red || "")}" autocomplete="off"><label for="u-red">Red (nombre)</label></div>
         <div class="campo"><input id="u-clave" type="password" placeholder=" " maxlength="63" autocomplete="new-password"><label for="u-clave">Clave de la red</label>
-          <div class="ayuda">En blanco se conserva la guardada.</div></div>
+          <div class="ayuda">En blanco se conserva la guardada. Si arriba dice «Sin conexión», escríbela de nuevo: puede estar mal guardada.</div></div>
         <div class="campo"><input id="u-servidor" placeholder=" " maxlength="100" value="${esc(ocultarClave(wifi.servidor))}" autocomplete="off" spellcheck="false"><label for="u-servidor">Servidor</label>
           <div class="ayuda">La dirección de F+data lleva la credencial del equipo (se muestra como •••).</div></div>
         <div class="acciones-informe"><button type="button" class="btn btn-borde" id="u-wifi-fdata">${linea("key-round")}Usar F+data como servidor</button></div>
@@ -706,15 +706,24 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
       try {
         const info = await api(`${API}/envio-wifi`);
         const local = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
-        const host = local ? info.ips[0] : location.hostname;
-        if (!host) return mostrarErrorEn(zonaError, "No encontramos la dirección de este PC en la red. Conéctalo a la red del hospital y vuelve a intentarlo.");
+        // El monitor solo llega a un PC que esté en su misma red: se elige la IP del PC con los mismos tres primeros números
+        // que la IP del monitor (192.168.0.21 → 192.168.0.x). Un PC puede tener varias (cable, WiFi, VPN).
+        const subred = (ip) => String(ip || "").split(".").slice(0, 3).join(".");
+        const ipMonitor = equipoUSB.wifi?.conectado ? equipoUSB.wifi.ip : "";
+        const mismaRed = ipMonitor ? info.ips.find((ip) => subred(ip) === subred(ipMonitor)) : undefined;
+        const host = local ? (mismaRed || info.ips[0]) : location.hostname;
+        if (!host) return mostrarErrorEn(zonaError, "No encontramos la dirección de este PC en la red. Conéctalo a la red del monitor y vuelve a intentarlo.");
         const puerto = location.port || String(info.puerto);
         const r = await api(`${API}/envio-wifi`, { metodo: "POST", datos: { equipo: codigo } });
         const url = `${location.protocol}//equipo:${r.secreto}@${host}${puerto && !["80", "443"].includes(puerto) ? `:${puerto}` : ""}${r.ruta}`;
         if (url.length > 100) return mostrarErrorEn(zonaError, "La dirección queda muy larga para el monitor (máximo 100 caracteres). Pide a la Unidad un nombre de servidor más corto.");
         fw.querySelector("#u-servidor").value = url;
-        mostrarErrorEn(zonaError, "");
-        toast("Dirección lista. Revisa la red y su clave y pulsa «Guardar WiFi» para ponerla en el monitor.", 8000);
+        if (local && ipMonitor && !mismaRed) {
+          mostrarErrorEn(zonaError, `Ojo: este PC está en la red ${host}, pero el monitor está en ${ipMonitor}. Conecta el PC a la misma red WiFi del monitor (${equipoUSB.wifi.red}) y vuelve a pulsar el botón; si no, los datos no llegarán.`);
+        } else {
+          mostrarErrorEn(zonaError, "");
+          toast("Dirección lista. Revisa la red y su clave y pulsa «Guardar WiFi» para ponerla en el monitor.", 8000);
+        }
       } catch (e) { mostrarErrorEn(zonaError, e.message || "No pudimos habilitar el envío. Intenta de nuevo."); }
     };
     document.getElementById("u-wifi-borrar").onclick = async () => {
