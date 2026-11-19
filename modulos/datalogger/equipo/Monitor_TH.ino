@@ -35,6 +35,7 @@
 #include "config_inicial.h"
 #include "logo_pantalla.h"      // LOGO_PANTALLA_170: F+data + "Funciona con" Fricke Store (1,9")
 #include "logo_pantalla_240.h"  // LOGO_PANTALLA_240 (pantalla 2,4")
+#include "logo_marca.h"         // MARCA_*: ícono de F+data de 24 px, siempre en la cabecera
 
 #define VERSION_FIRMWARE "2.3"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
 #define LARGO_LINEA  200  // largo máximo de una fila de registro (incluida la firma)
@@ -2079,6 +2080,25 @@ static void textoDerecha(int xDer, int y, const char *s, uint8_t tam, uint16_t c
   texto(xDer - anchoTexto(s, tam), y, s, tam, color);
 }
 
+// Corta el texto a maxCar caracteres (no bytes), para que no pase bajo el ícono de la cabecera.
+static void recortar(char *s, int maxCar) {
+  int n = 0;
+  for (char *c = s; *c; c++) {
+    if ((*c & 0xC0) == 0x80) continue;  // byte de continuación UTF-8: sigue al carácter anterior
+    if (n++ == maxCar) { *c = '\0'; return; }
+  }
+}
+
+// Ícono de F+data (herramientas/generar_marca.py). Va píxel a píxel por el lienzo indexado; las
+// esquinas transparentes no se dibujan, así queda bien sobre cualquier color de cabecera.
+static void dibujarMarca(int x, int y) {
+  for (int j = 0; j < MARCA_LADO; j++)
+    for (int i = 0; i < MARCA_LADO; i++) {
+      uint8_t k = pgm_read_byte(&MARCA_PIXELES[j * MARCA_LADO + i]);
+      if (k != MARCA_TRANSPARENTE) gfx->drawPixel(x + i, y + j, MARCA_PALETA[k]);
+    }
+}
+
 static void textoCentro(int y, const char *s, uint8_t tam, uint16_t color) {
   texto((ANCHO - anchoTexto(s, tam)) / 2, y, s, tam, color);
 }
@@ -2424,17 +2444,30 @@ static void dibujar() {
   }
 
   gfx->fillRect(0, 0, ANCHO, ALTO_CABECERA, enAlarma ? C_ALARMA_FONDO : aviso ? C_AVISO_FONDO : C_CABECERA);
+  // Ícono de F+data siempre visible a la derecha de la cabecera (firmware 2.3): 24 px, el mínimo
+  // de las directrices, centrado en la altura y con su área de resguardo (6 px) libre alrededor.
+  // Los textos de la cabecera se cortan antes de ese margen.
+  const int xMarca = ANCHO - 6 - MARCA_LADO;
+  const int libreDer = xMarca - 6;                // nada de la cabecera pasa de aquí
+  const int maxCar = (libreDer - 4) / 6;          // caracteres de tamaño 1 que caben desde x = 4
+  dibujarMarca(xMarca, (ALTO_CABECERA - MARCA_LADO) / 2);
   char buf[32];
   if (enAlarma) {
     char nombre[32];
     nombreSensor(indices[primeraAlarma], copia[primeraAlarma].ieee, nombre, sizeof(nombre));
     texto(4, 9, enAlarma > 1 ? "ALARMA (varios)" : "ALARMA", 1, C_TEXTO);
     const Sensor &a = copia[primeraAlarma];
-    if (a.enAlarma) snprintf(buf, sizeof(buf), "%s %.1fC", nombre, a.temp);
-    else snprintf(buf, sizeof(buf), "%s %.0f%% HR", nombre, a.hum);
+    // Si no cabe, se acorta el nombre y nunca el valor.
+    char valor[12];
+    if (a.enAlarma) snprintf(valor, sizeof(valor), "%.1fC", a.temp);
+    else snprintf(valor, sizeof(valor), "%.0f%% HR", a.hum);
+    recortar(nombre, maxCar - (int)strlen(valor) - 1);
+    snprintf(buf, sizeof(buf), "%s %s", nombre, valor);
     texto(4, 25, buf, 1, C_TEXTO);
   } else if (aviso) {
-    texto(4, 17, avisoTexto, 1, C_TEXTO);
+    snprintf(buf, sizeof(buf), "%s", avisoTexto);
+    recortar(buf, maxCar);
+    texto(4, 17, buf, 1, C_TEXTO);
   } else {
     // Fecha como pide la redacción de Fricke Store: "miércoles 18 nov 2026", hora en 24 h.
     static const char *DIAS[] = {"domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"};
@@ -2447,16 +2480,21 @@ static void dibujar() {
       localtime_r(&ahora, &t);
       strftime(hora, sizeof(hora), "%H:%M", &t);
       snprintf(fecha, sizeof(fecha), "%s %d %s %d", DIAS[t.tm_wday], t.tm_mday, MESES[t.tm_mon], t.tm_year + 1900);
+      // Con el ícono de F+data, "miércoles 30 sept 2026" no cabe en 1,9": el día va abreviado.
+      static const char *DIAS_CORTOS[] = {"dom", "lun", "mar", "mié", "jue", "vie", "sáb"};
+      if (4 + anchoTexto(fecha, 1) > libreDer)
+        snprintf(fecha, sizeof(fecha), "%s %d %s %d", DIAS_CORTOS[t.tm_wday], t.tm_mday, MESES[t.tm_mon], t.tm_year + 1900);
     }
     texto(4, 5, hora, 2, C_TEXTO);
     texto(4, 27, fecha, 1, C_TEXTO);
   }
   // Indicador de la micro SD: verde si está grabando, amarillo si falta pero se
   // está guardando en la flash, rojo si no se puede guardar en ninguna parte.
-  textoDerecha(ANCHO - 4, 9, "SD", 1, sdOk ? C_NORMAL : flashOk ? C_AVISO : C_CALOR);
+  // Van a la izquierda del ícono de F+data.
+  textoDerecha(libreDer, 9, "SD", 1, sdOk ? C_NORMAL : flashOk ? C_AVISO : C_CALOR);
   if (paginas > 1) {
     snprintf(buf, sizeof(buf), "%d/%d", pagina + 1, paginas);
-    textoDerecha(ANCHO - 4 - 12 - 8, 9, buf, 1, C_TEXTO);
+    textoDerecha(libreDer - 12 - 8, 9, buf, 1, C_TEXTO);
   }
 
   if (n == 0) {

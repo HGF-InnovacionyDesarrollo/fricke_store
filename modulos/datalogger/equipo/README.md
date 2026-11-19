@@ -212,6 +212,11 @@ entonces:
   reactiva manteniendo otra vez el pulsador 3 s. Mientras la SD no se usa, la barra
   inferior lo avisa en amarillo. Si se saca sin avisar, se detecta en
   unos segundos y no se pierden filas.
+- Cabecera: el ícono de F+data siempre visible a la derecha (24 px, el mínimo de las
+  directrices de Fricke Store, con 6 px libres alrededor; firmware 2.3). La hora, la
+  fecha, la alarma y los avisos se acortan para no pasar bajo el ícono: en la alarma
+  se acorta el nombre del sensor, nunca el valor. El ícono se genera desde
+  `logo_f-data.png` con `python herramientas/generar_marca.py logo_marca.h`.
 - Barra inferior: cuenta regresiva del emparejamiento; si no, avisos técnicos en
   amarillo ("! Reloj sin hora", "! Sensor N sin datos", "! Sensor N bateria baja");
   si no hay, cantidad de sensores y filas pendientes de pasar a la SD.
