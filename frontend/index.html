@@ -37,9 +37,10 @@
   </form>
 
   <div class="sugerencias">
-    <button class="sugerencia" data-texto="¿Cuál es el protocolo vigente de prevención de caídas?">
-      <span data-icono="documento"></span><span><b>Buscar un protocolo</b><small>Normas, guías y procedimientos</small></span>
-    </button>
+    <!-- Lleva al buscador de F+docs (módulo "documentos"); inicio.js lo muestra solo si la persona tiene ese módulo -->
+    <a class="sugerencia oculto" id="buscar-documento" href="/m/documentos/buscar">
+      <span data-icono="documento"></span><span><b>Buscar un documento</b><small>Normas, guías y procedimientos</small></span>
+    </a>
     <button class="sugerencia" data-texto="Resume los puntos clave del último instructivo de mi unidad">
       <span data-icono="chispa"></span><span><b>Resumir un documento</b><small>Instructivos y circulares</small></span>
     </button>
