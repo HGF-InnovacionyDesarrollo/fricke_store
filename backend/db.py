@@ -243,9 +243,53 @@ def _espejo_siem(ts, usuario_id, accion, detalle, ip, h):
         pass  # el espejo nunca debe impedir registrar en la bitácora principal
 
 
+def _archivo_anclas() -> Path:
+    from config import DATOS_DIR
+    return Path(DATOS_DIR) / "logs" / "anclas_bitacora.jsonl"
+
+
+def _anclas_externas() -> dict[int, str]:
+    """Huellas guardadas fuera de la base por anclar_auditoria(): {id del registro: hash}."""
+    anclas = {}
+    try:
+        for linea in _archivo_anclas().read_text(encoding="utf-8").splitlines():
+            try:
+                a = json.loads(linea)
+                anclas[int(a["id"])] = a["hash"]
+            except (ValueError, KeyError, TypeError):
+                continue
+    except OSError:
+        pass
+    return anclas
+
+
+def anclar_auditoria() -> dict | None:
+    """Guarda fuera de la base la huella del último registro de la bitácora (a diario, con `gestionar.py depurar`).
+    Quien tenga acceso a la base podría rehacer toda la cadena con hashes nuevos; contra estas anclas no calzaría.
+    Se copia además a ECO_RESPALDO_COPIA (otro equipo) si está definida."""
+    from config import RESPALDO_COPIA_EXTERNA
+    with bd() as c:
+        f = c.execute("SELECT id, ts, hash FROM auditoria ORDER BY id DESC LIMIT 1").fetchone()
+    if not f:
+        return None
+    linea = json.dumps({"id": f["id"], "ts": f["ts"], "hash": f["hash"], "anclado_en": ahora()}, ensure_ascii=False) + "\n"
+    destinos = [_archivo_anclas()]
+    if RESPALDO_COPIA_EXTERNA:
+        destinos.append(Path(RESPALDO_COPIA_EXTERNA) / f"anclas_bitacora_{ESTABLECIMIENTO}.jsonl")
+    for d in destinos:
+        try:
+            d.parent.mkdir(parents=True, exist_ok=True)
+            with open(d, "a", encoding="utf-8") as fh:
+                fh.write(linea)
+        except OSError:
+            pass
+    return {"id": f["id"], "hash": f["hash"]}
+
+
 def verificar_auditoria() -> dict:
     # Si se archivaron registros antiguos, la cadena continúa desde el ancla guardada.
     ancla = leer_ajuste("ancla_auditoria", GENESIS)
+    externas = _anclas_externas()
     with bd() as c:
         anterior = ancla
         n = 0
@@ -254,8 +298,11 @@ def verificar_auditoria() -> dict:
             esperado = _hash_fila(anterior, f["ts"], f["usuario_id"], f["accion"], f["detalle"], f["ip"])
             if f["hash_anterior"] != anterior or f["hash"] != esperado:
                 return {"integra": False, "registros": n, "falla_en_id": f["id"]}
+            if f["id"] in externas and externas[f["id"]] != f["hash"]:
+                # La cadena calza consigo misma, pero no con la huella guardada fuera: fue reescrita.
+                return {"integra": False, "registros": n, "falla_en_id": f["id"], "motivo": "no coincide con el ancla externa"}
             anterior = f["hash"]
-        return {"integra": True, "registros": n, "ultimo_hash": anterior}
+        return {"integra": True, "registros": n, "ultimo_hash": anterior, "anclas_externas": len(externas)}
 
 
 def archivar_auditoria(dias: int, carpeta) -> dict:

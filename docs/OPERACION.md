@@ -31,7 +31,17 @@ python backend\servidor.py
 ```
 
 - Sirve HTTPS en el puerto 8443 (configurable con `ECO_PUERTO_HTTPS`) con TLS 1.2 o superior y cifrados modernos.
-- El puerto HTTP (8090, `ECO_PUERTO_HTTP`) solo redirige a HTTPS.
+- El puerto HTTP (8090, `ECO_PUERTO_HTTP`) redirige a HTTPS y es además la **puerta para equipos**: solo acepta los
+  envíos (POST) de los aparatos a `/api/m/<módulo>/equipo` (hoy, los Monitor T/H de F+data, que no hablan HTTPS).
+  Todo lo demás se redirige a HTTPS (decisión del 19 nov 2026; `backend/puerta_equipos.py`).
+- Por HTTP la credencial del equipo **no va cifrada**. Por eso:
+  - los equipos van en una **red separada (VLAN)** de la de los usuarios, acordada con TI;
+  - `ECO_EQUIPOS_REDES=10.20.30.0/24` (una o varias redes, separadas por coma) hace que la puerta acepte envíos solo
+    desde esa red;
+  - la regla del firewall de Windows para el puerto HTTP se limita a esa red y a los perfiles *Dominio* y *Privado*
+    (nunca *Público*). Por ejemplo:
+    `netsh advfirewall firewall add rule name="Fricke Store equipos" dir=in action=allow protocol=TCP localport=8090 remoteip=10.20.30.0/24 profile=domain,private`
+  - Más adelante, el firmware con HTTPS (verificando el certificado del hospital) permitirá cerrar esta puerta.
 - Con HTTPS el portal envía `Strict-Transport-Security` y la cookie de sesión sale con `Secure`.
 - Si se publica detrás de un proxy inverso (IIS, nginx), el proxy termina TLS y el lanzador acepta los encabezados `X-Forwarded-*`.
 
@@ -53,7 +63,15 @@ python backend/respaldo.py restaurar fricke-AAAAMMDDTHHMMSSZ.dump.gz.enc   # en 
 ```bat
 schtasks /Create /TN "FrickeStore Respaldo" /SC DAILY /ST 02:30 /TR "python C:\FrickeStore\backend\respaldo.py crear"
 schtasks /Create /TN "FrickeStore Prueba restauracion" /SC MONTHLY /D 1 /ST 03:30 /TR "python C:\FrickeStore\backend\respaldo.py probar"
+schtasks /Create /TN "FrickeStore Depurar" /SC DAILY /ST 02:45 /TR "python C:\FrickeStore\backend\gestionar.py depurar"
+schtasks /Create /TN "FrickeStore Archivar bitacora" /SC MONTHLY /D 1 /ST 04:00 /TR "python C:\FrickeStore\backend\gestionar.py archivar-bitacora"
 ```
+
+- **Depurar (obligatorio, a diario):** aplica el plazo de conservación de cada módulo (Ley 21.719): vacía la papelera de
+  F+docs, borra las simulaciones de F+mefi de más de un año, las mediciones de F+data de más de 5 años, etc. Además guarda
+  fuera de la base la huella del último registro de la bitácora (`data/<establecimiento>/logs/anclas_bitacora.jsonl` y una
+  copia en `ECO_RESPALDO_COPIA`): si alguien con acceso a la base rehiciera la bitácora completa, la verificación de
+  integridad lo detecta. El panel avisa si la depuración lleva más de 26 horas sin correr.
 
 - El panel (**Administración › Seguridad y respaldos**) muestra el último respaldo y la última prueba. Genera una alerta si el respaldo tiene más de 26 horas o si no se ha probado una restauración en 3 meses.
 - **Objetivos propuestos** (confirmar con un análisis de impacto): RPO de 24 horas (lo que se puede perder) y RTO de 4 horas (lo que puede tardar volver a operar). Si se necesita un RPO menor, programa respaldos cada 4 horas.

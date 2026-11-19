@@ -107,3 +107,18 @@ def test_mis_simulaciones_y_descarga_de_mis_datos_ley_21719(personas):
     exportado = tc.get("/api/cuenta/exportar").json()
     registros = exportado["modulos"][CLAVE]["datos"]["simulaciones_registradas"]
     assert any(r["titulo"] == "Ejercicio propio para portabilidad" for r in registros)
+
+
+def test_cada_persona_ve_solo_sus_simulaciones_y_sin_rut(personas):
+    admin, func, _ = personas
+    otro = nuevo_usuario("funcionario", "Mat. Otra Colega")
+    base = {"titulo": "Práctica de variables", "escenario": "personalizado"}
+    sid = cliente(func).post(f"{API}/simulaciones", json=base).json()["id"]
+    # Otra persona (sin permiso de moderar) no ve la simulación ajena, ni pidiendo "todas"
+    assert sid not in [s["id"] for s in cliente(otro).get(f"{API}/simulaciones").json()]
+    # Quien modera ve las de todos
+    assert sid in [s["id"] for s in cliente(admin).get(f"{API}/simulaciones").json()]
+    # El texto libre no acepta un RUT
+    for campo in ("titulo", "nota_docente"):
+        r = cliente(func).post(f"{API}/simulaciones", json={**base, campo: "Paciente 12.345.678-5 en sala 3"})
+        assert r.status_code == 422

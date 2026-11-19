@@ -111,7 +111,7 @@ def test_buscar_sin_tildes_ni_mayusculas_y_por_carpeta(personas):
     assert did not in [d["id"] for d in tl.get(f"{API}/buscar", params={"q": "caidas"}).json()["documentos"]]  # lo eliminado no aparece
 
 
-def test_reemplazar_deja_la_version_anterior_en_la_papelera(personas):
+def test_reemplazar_deja_la_version_anterior_en_el_historial(personas):
     editora, lector, _ = personas
     te = cliente(editora)
     did = subir(te).json()["id"]
@@ -121,7 +121,7 @@ def test_reemplazar_deja_la_version_anterior_en_la_papelera(personas):
     assert cliente(lector).get(f"{API}/documentos/{did}/archivo").content == nuevo
     pap = te.get(f"{API}/papelera").json()
     vieja = next(v for v in pap["versiones"] if v["documento_id"] == did)
-    assert vieja["dias"] == 30 and vieja["por"] == "Ema Editora"
+    assert vieja["dias"] == 5 * 365 + 1 and vieja["por"] == "Ema Editora"  # historial de 5 años
     assert te.get(f"{API}/papelera/versiones/{vieja['id']}/archivo").content == PDF
     # restaurar la anterior: vuelve a ser la vigente y la nueva pasa a la papelera
     assert te.post(f"{API}/papelera/versiones/{vieja['id']}/restaurar").status_code == 200
@@ -172,3 +172,21 @@ def test_bitacora_sin_contenido_y_descarga_de_mis_datos(personas):
     datos = te.get("/api/cuenta/exportar").json()["modulos"][CLAVE]["datos"]
     assert any(d["id"] == did for d in datos["documentos"])
     assert all("contenido" not in v for v in datos["versiones_subidas"])
+
+
+def test_versiones_anteriores_quedan_5_anios_en_el_historial(personas):
+    editora, _, _ = personas
+    te = cliente(editora)
+    did = subir(te).json()["id"]
+    assert te.post(f"{API}/documentos/{did}/version",
+                   json={"nombre_archivo": "v2.pdf", "contenido": b64(PDF + b"% v2\n")}).status_code == 200
+    with plataforma.bd_modulo(CLAVE) as c:
+        c.execute("UPDATE versiones SET reemplazada_en = now() - interval '400 days' WHERE documento_id=? "
+                  "AND reemplazada_en IS NOT NULL", (did,))
+    plataforma.REGISTRO[CLAVE].depurar()
+    assert any(v["documento_id"] == did for v in te.get(f"{API}/papelera").json()["versiones"])
+    with plataforma.bd_modulo(CLAVE) as c:
+        c.execute("UPDATE versiones SET reemplazada_en = now() - interval '1830 days' WHERE documento_id=? "
+                  "AND reemplazada_en IS NOT NULL", (did,))
+    plataforma.REGISTRO[CLAVE].depurar()
+    assert not any(v["documento_id"] == did for v in te.get(f"{API}/papelera").json()["versiones"])

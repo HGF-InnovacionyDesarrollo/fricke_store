@@ -124,3 +124,14 @@ def test_migraciones_sin_transacciones_propias(modulo):
         texto = re.sub(r"--.*", "", p.read_text(encoding="utf-8")).upper()
         assert not re.search(r"\b(BEGIN|COMMIT|ROLLBACK)\b\s*;", texto), f"{p.name}: el portal ya usa una transacción."
         assert "PORTAL." not in texto, f"{p.name}: un módulo no toca el esquema del portal."
+
+
+def test_sin_columnas_boolean(modulo):
+    """Sí/no se guarda como número 0/1 (SMALLINT con CHECK), nunca BOOLEAN: así lo lee igual todo el portal.
+    Se revisa la base ya migrada, para que una migración nueva pueda corregir una antigua sin editarla."""
+    from db import bd
+    with bd() as c:
+        filas = c.execute("SELECT table_name, column_name FROM information_schema.columns "
+                          "WHERE table_schema=? AND data_type='boolean'", (plataforma.esquema_de(modulo.manifiesto.clave),)).fetchall()
+    assert not filas, ("Columnas BOOLEAN (usa SMALLINT 0/1 con CHECK): "
+                       + ", ".join(f"{f['table_name']}.{f['column_name']}" for f in filas))

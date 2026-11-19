@@ -46,18 +46,20 @@ def slug(nombre: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
 
 
+NOMBRE_VALIDO = re.compile(r"F\+[a-zñáéíóúü]{2,12}")
+
+
 def problemas_nombre(nombre: str) -> list[str]:
-    p = []
-    palabras = nombre.split()
-    if not palabras:
+    """Regla de nombres (decisión del 18 nov 2026): «F+» y una palabra corta en minúsculas, sin espacios ni tildes de
+    más: F+data, F+mefi, F+docs. La palabra dice qué hace el módulo; no lleva «fricke», «app» ni «sistema»."""
+    nombre = (nombre or "").strip()
+    if not nombre:
         return ["El nombre está vacío."]
-    if len([w for w in palabras if w.lower() not in CONECTORES]) > 2:
-        p.append("El nombre debe tener una o dos palabras (sin contar «de», «y», etc.).")
-    if any(w.lower().strip(".,") in PALABRAS_PROHIBIDAS for w in palabras):
+    p = []
+    if not NOMBRE_VALIDO.fullmatch(nombre):
+        p.append("El nombre es «F+» y una palabra corta en minúsculas, sin espacios (ej.: «F+data», «F+docs»).")
+    if any(x in nombre.lower() for x in PALABRAS_PROHIBIDAS):
         p.append("El nombre no lleva «Fricke», «App» ni «Sistema».")
-    if not palabras[0][0].isupper() or palabras[0][1:] != palabras[0][1:].lower() \
-            or any(w[0].isupper() for w in palabras[1:] if not w.isupper()):
-        p.append("Mayúscula solo en la primera palabra (ej.: «Prevención de caídas»).")
     return p
 
 

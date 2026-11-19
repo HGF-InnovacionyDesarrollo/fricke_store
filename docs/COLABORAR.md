@@ -53,7 +53,7 @@ portal te pedirá configurar Microsoft Authenticator la primera vez. Usa un RUT 
 git checkout main
 git pull
 git checkout -b modulo/farmacia
-python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "Farmacia" --familia 2
+python backend/gestionar.py nuevo-modulo --clave farmacia --nombre "F+farmacia" --familia 2
 ```
 
 - La **familia** (1 a 5) y el **pictograma** del ícono se eligen según las

@@ -19,7 +19,7 @@ Pregunta solo lo que falte, todo en un mensaje:
 - **Cuánto tiempo deben guardarse** los datos (plazo de conservación).
 - **Familia de color** del ícono (propón una con su motivo, la persona confirma):
   1 Atención y acceso · 2 Clínica · 3 Calidad y seguridad · 4 Operaciones y equipos · 5 Personas y gestión.
-- **Nombre**: una o dos palabras, mayúscula solo inicial, sin "Fricke", "App", "Sistema" ni siglas.
+- **Nombre**: «F+» y una palabra corta en minúsculas, sin espacios (F+data, F+mefi, F+docs), sin "Fricke", "App" ni "Sistema". Regla del 18 nov 2026, la verifica el portal al cargar el módulo. Propón uno (por ejemplo `F+farmacia`) y la persona confirma.
 - **Pictograma**: propón un ícono de [Lucide](https://lucide.dev) (metáfora concreta, máximo 3 elementos, sin texto)
   distinto de los otros módulos de la misma familia. Guarda su SVG de 24 × 24 en `modulos/<clave>/pictograma.svg`
   (Lucide es ISC: deja el comentario de atribución).

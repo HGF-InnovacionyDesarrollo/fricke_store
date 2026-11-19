@@ -8,7 +8,7 @@
 - [ ] La familia está elegida y el degradado coincide con la tabla de familias.
 - [ ] El pictograma usa trazo 2 sobre la retícula de 24, sin texto y con tres elementos o menos.
 - [ ] Se entiende a 24 px y no se confunde con otro módulo de la misma familia.
-- [ ] El nombre tiene una o dos palabras, sin "Fricke", "App", "Sistema" ni siglas.
+- [ ] El nombre es «F+» y una palabra corta en minúsculas (F+data, F+docs), sin "Fricke", "App" ni "Sistema".
 - [ ] Están todos los archivos del ícono (`backend/logo_modulo.py --verificar`).
 
 **Interfaz**

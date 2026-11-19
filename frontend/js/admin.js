@@ -483,7 +483,7 @@ document.addEventListener("click", (e) => {
         ${campo("em-resp", "Unidad responsable", m?.responsable || "", 'maxlength="120"')}
         <div class="check-lista">
           <label class="check"><input type="checkbox" id="em-sens" ${m?.datos_sensibles ? "checked" : ""}> Trata datos de salud u otros sensibles</label>
-          <label class="check"><input type="checkbox" id="em-eipd" ${m?.eipd_aprobada ? "checked" : ""}> Evaluación de impacto aprobada por el DPD</label>
+          <label class="check"><input type="checkbox" id="em-eipd" ${m?.eipd_aprobada ? "checked" : ""} ${MI_ROL === "dpd" ? "" : "disabled"}> Evaluación de impacto aprobada por el DPD${MI_ROL === "dpd" ? "" : " (solo la marca el DPD)"}</label>
           <label class="check"><input type="checkbox" id="em-activo" ${m ? (m.activo ? "checked" : "") : "checked"}> Activo</label>
         </div>
         <div class="zona-error"></div>`,

@@ -3,10 +3,11 @@ Todo endpoint usa Depends(acceso(...)) y registra acciones en la bitácora sin d
 Implementa el motor determinístico MEFI v2.0 (Protocolo V2 sept. 2025, ACOG CPG No. 10 2025, FIGO 2015 y NICE NG229)
 sobre escenarios docentes y simulaciones de capacitación sin datos de pacientes.
 """
+import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from plataforma import ContextoModulo, acceso, bd_modulo, nombres_de
 
@@ -23,6 +24,10 @@ VARIABILIDAD_REDUCIDA_MAX = 5.0
 VARIABILIDAD_NORMAL_MAX = 25.0
 DESACEL_PROLONGADA_MIN_S = 120
 DESACEL_MUY_PROLONGADA_S = 300
+
+
+# RUT con o sin puntos y con guion (12.345.678-5, 12345678-5)
+_PARECE_RUT = re.compile(r"\b\d{1,2}\.?\d{3}\.?\d{3}\s*-\s*[\dkK]\b")
 
 
 class NuevaSimulacion(BaseModel):
@@ -44,6 +49,14 @@ class NuevaSimulacion(BaseModel):
     contracciones_10min: float = Field(default=3.0, ge=0.0, le=15.0)
     patron_sinusoidal: bool = False
     nota_docente: str = Field(default="", max_length=600)
+
+    @field_validator("titulo", "nota_docente")
+    @classmethod
+    def _sin_rut(cls, v: str) -> str:
+        """Módulo docente: el texto libre no puede llevar un RUT (señal de que se están anotando datos de una paciente)."""
+        if _PARECE_RUT.search(v or ""):
+            raise ValueError("No escribas RUT ni otros datos de pacientes: este módulo es solo para simulación docente.")
+        return v
 
 
 def evaluar_parametros_mefi(d: NuevaSimulacion) -> dict:
@@ -240,6 +253,8 @@ def listar_casos_docentes(ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.
 
 @router.get("/simulaciones")
 def listar_simulaciones(mias: bool = False, ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.ver"))):
+    if not ctx.puede(f"{CLAVE}.moderar"):
+        mias = True  # cada persona ve solo sus simulaciones; las de todos, quien modera
     with bd_modulo(CLAVE) as c:
         if mias:
             filas = [

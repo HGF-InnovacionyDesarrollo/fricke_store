@@ -6,8 +6,6 @@ r"""Lanzador del portal. Con certificado configurado sirve HTTPS (TLS 1.2+) y re
 import os
 import ssl
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 sys.path.insert(0, os.path.dirname(__file__))
 import uvicorn  # noqa: E402
@@ -19,27 +17,24 @@ PUERTO_HTTPS = int(os.environ.get("ECO_PUERTO_HTTPS", 8443))
 HOST = os.environ.get("ECO_HOST", "0.0.0.0")
 
 
-class Redireccion(BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
-        host = (self.headers.get("Host") or "").split(":")[0]
-        self.send_response(301)
-        self.send_header("Location", f"https://{host}:{PUERTO_HTTPS}{self.path}")
-        self.end_headers()
-
-    do_POST = do_HEAD = do_GET
-
-    def log_message(self, *a):
-        pass
-
-
 def main():
     if cfg.TLS_CERT and cfg.TLS_KEY:
-        threading.Thread(target=HTTPServer((HOST, PUERTO_HTTP), Redireccion).serve_forever, daemon=True).start()
-        print(f"{cfg.NOMBRE_PRODUCTO} en https://{HOST}:{PUERTO_HTTPS} (HTTP {PUERTO_HTTP} redirige a HTTPS)")
-        uvicorn.run("app:app", app_dir=os.path.dirname(__file__), host=HOST, port=PUERTO_HTTPS,
-                    ssl_certfile=cfg.TLS_CERT, ssl_keyfile=cfg.TLS_KEY,
-                    ssl_ciphers="ECDHE+AESGCM:ECDHE+CHACHA20", ssl_version=ssl.PROTOCOL_TLS_SERVER,
-                    proxy_headers=True)
+        import asyncio
+
+        from app import app
+        from puerta_equipos import puerta_equipos
+        print(f"{cfg.NOMBRE_PRODUCTO} en https://{HOST}:{PUERTO_HTTPS}. El HTTP {PUERTO_HTTP} redirige a HTTPS y solo "
+              "acepta los envíos de los equipos (puerta para equipos, ver docs/OPERACION.md).")
+        https = uvicorn.Server(uvicorn.Config(app, host=HOST, port=PUERTO_HTTPS,
+                                              ssl_certfile=cfg.TLS_CERT, ssl_keyfile=cfg.TLS_KEY,
+                                              ssl_ciphers="ECDHE+AESGCM:ECDHE+CHACHA20",
+                                              ssl_version=ssl.PROTOCOL_TLS_SERVER, proxy_headers=True))
+        http = uvicorn.Server(uvicorn.Config(puerta_equipos(app, PUERTO_HTTPS), host=HOST, port=PUERTO_HTTP,
+                                             lifespan="off"))
+
+        async def ambos():
+            await asyncio.gather(https.serve(), http.serve())
+        asyncio.run(ambos())
     else:
         print(f"{cfg.NOMBRE_PRODUCTO} en http://{HOST}:{PUERTO_HTTP} — SIN HTTPS: solo para desarrollo. "
               "Configura ECO_TLS_CERT y ECO_TLS_KEY para producción.")
