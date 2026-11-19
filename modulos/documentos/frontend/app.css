@@ -1,0 +1,78 @@
+/* Estilos de F+docs. Solo variables de base.css; el color de la familia va solo en el ícono. */
+#contenido { max-width: 960px; }
+.cabecera-pantalla .espacio { flex: 1; }
+.cabecera-pantalla .btn .linea, .fila-acciones .btn .linea, .elegir-archivo .btn .linea { width: 18px; height: 18px; margin-right: 8px; }
+.titulo-seccion { margin-top: 24px; }
+.cabecera-pantalla + #lista > .titulo-seccion:first-child, #resultados > .pista + .titulo-seccion { margin-top: 0; }
+
+/* ---------- migas de pan ---------- */
+.migas { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-size: 14px; line-height: 20px; color: var(--texto-2); }
+.migas a { color: var(--primario); text-decoration: none; padding: 4px 4px; border-radius: 4px; }
+.migas a:hover { text-decoration: underline; }
+.migas a:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
+.migas .sep .linea { width: 16px; height: 16px; color: var(--texto-3); vertical-align: middle; }
+.migas [aria-current] { padding: 4px; }
+
+/* ---------- listas de carpetas y documentos ---------- */
+.lista { list-style: none; margin: 0; padding: 4px 0; }
+.fila { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 4px 8px 4px 0; position: relative; }
+.fila + .fila { border-top: 1px solid var(--borde-suave); }
+.fila-principal { display: flex; align-items: flex-start; gap: 16px; flex: 1 1 0; min-width: 0; min-height: 48px;
+  padding: 8px 16px; border-radius: 8px; color: var(--texto); text-decoration: none; }
+.fila-principal:hover { background: var(--hover); text-decoration: none; }
+.fila-principal:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
+.fila-icono { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px;
+  background: var(--superficie); color: var(--texto-2); }
+.fila-icono.carpeta { background: var(--primario-suave); color: var(--primario); }
+.fila-icono .linea { width: 20px; height: 20px; }
+.fila-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fila-titulo { font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.fila-desc { font-size: 14px; line-height: 20px; color: var(--texto-2); overflow-wrap: anywhere; }
+.fila-meta { font-size: 12px; line-height: 16px; color: var(--texto-3); }
+.fila-meta.quedan { color: var(--texto-2); font-weight: 500; }
+.fila-ruta { order: 3; flex-basis: 100%; padding: 0 16px 8px 72px; font-size: 12px; line-height: 16px; }
+.fila-ruta > .linea { width: 14px; height: 14px; color: var(--texto-3); margin-right: 2px; }
+.fila-ruta a { padding: 2px; }
+.fila-acciones { display: flex; align-items: center; gap: 4px; margin-left: auto; position: relative; }
+.fila-acciones a.btn-icono { display: inline-grid; place-items: center; color: var(--texto-2); }
+
+/* ---------- menú ⋮ ---------- */
+.menu-acciones { position: absolute; right: 0; top: 44px; z-index: 20; min-width: 240px; padding: 8px 0;
+  background: var(--tarjeta); border-radius: 8px; box-shadow: var(--sombra-pop); }
+.menu-acciones button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 16px;
+  border: 0; background: none; font: inherit; font-size: 14px; color: var(--texto); text-align: left; cursor: pointer; }
+.menu-acciones button:hover, .menu-acciones button:focus-visible { background: var(--hover); outline: none; }
+.menu-acciones button:focus-visible { box-shadow: inset 0 0 0 2px var(--primario); }
+.menu-acciones .linea { width: 20px; height: 20px; color: var(--texto-2); }
+.menu-acciones .peligro, .menu-acciones .peligro .linea { color: var(--peligro); }
+
+/* ---------- buscar ---------- */
+.buscador-grande { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; margin: 0 0 16px;
+  border: 1px solid var(--borde); border-radius: 28px; background: var(--fondo); }
+.buscador-grande:focus-within { border-color: var(--primario); box-shadow: 0 0 0 1px var(--primario); }
+.buscador-grande .linea { width: 20px; height: 20px; color: var(--texto-3); flex: none; }
+.buscador-grande input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; font: inherit; font-size: 16px; color: var(--texto); outline: none; }
+.pista { font-size: 14px; line-height: 20px; color: var(--texto-2); margin: 0 0 16px; }
+
+/* ---------- diálogos ---------- */
+.aviso-suave.chico { font-size: 13px; line-height: 18px; margin: 0 0 16px; }
+.elegir-archivo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 20px; }
+.elegir-archivo .btn { cursor: pointer; }
+.elegir-archivo input:focus-visible + label { outline: 2px solid var(--primario); outline-offset: 2px; }
+
+/* ---------- acerca ---------- */
+.ficha { max-width: 640px; }
+.ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; font-size: 14px; line-height: 20px; }
+.ficha dt { color: var(--texto-3); }
+.ficha dd { margin: 0; }
+
+@media (max-width: 600px) {
+  .fila-principal { padding: 8px 12px; gap: 12px; }
+  .fila-ruta { padding-left: 64px; }
+  .ficha dl { grid-template-columns: 1fr; gap: 2px; }
+  .ficha dd { margin-bottom: 8px; }
+  .cabecera-pantalla { flex-wrap: wrap; }
+  .fila { padding-right: 4px; gap: 0 4px; }
+  .fila-acciones { gap: 0; }
+  #contenido { padding-bottom: 96px; }   /* que el botón flotante "Subir PDF" no tape la última fila */
+}
