@@ -19,6 +19,7 @@ import os
 import queue
 import re
 import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
@@ -216,8 +217,23 @@ def puertos() -> list[tuple[str, str]]:
     return [(d, t) for _, d, t in lista]
 
 
-def flashear(puerto: str, borrar_todo: bool, escribir):
-    """Instala el firmware incluido con esptool. escribir(texto) recibe la salida."""
+# Una sola división de la memoria para todas las placas (../partitions.csv, desde el firmware 2.5):
+# la de 4 MB. Al pasar una placa de 8 MB que tenía la división antigua de 8 MB, se borra la zona que la
+# división nueva usa para el respaldo interno, la red Zigbee y el coredump (de 0x290000 a 0x400000):
+# ahí quedaba parte del programa viejo. La NVS (0x9000: configuración, sensores, WiFi y clave de
+# firma) está en el mismo lugar en las dos y no se toca.
+ZONA_DATOS_4MB = (0x290000, 0x170000)
+
+
+class CambioDeDivision(Exception):
+    """La placa tiene otra división de la memoria (la antigua de 8 MB): hay que confirmar el cambio."""
+
+
+def flashear(puerto: str, borrar_todo: bool, escribir, cambiar_division: bool = False):
+    """Instala el firmware incluido con esptool. escribir(texto) recibe la salida.
+
+    Si la placa tiene otra división de la memoria y no se pidió cambiar_division, no escribe
+    nada y lanza CambioDeDivision para que la interfaz lo confirme con la persona."""
     import esptool
 
     texto = []
@@ -232,23 +248,36 @@ def flashear(puerto: str, borrar_todo: bool, escribir):
             pass
 
     base = ["--chip", "esp32c6", "--port", puerto, "--baud", "921600"]
+    fw = lambda n: recurso("firmware", n)
     with redirect_stdout(Salida()), redirect_stderr(Salida()):
-        # La partición del firmware depende del tamaño de la flash de la placa:
-        # instalar la de 8 MB en una de 4 MB deja la red Zigbee y el respaldo fuera de la memoria.
         esptool.main(base + ["flash-id"])
         m = re.search(r"Detected flash size:\s*(\d+)MB", "".join(texto))
         mb = int(m.group(1)) if m else 0
-        if mb >= 8:
-            carpeta = "8MB"
-        elif mb == 4:
-            carpeta = "4MB"
-        else:
+        if mb < 4:
             raise RuntimeError(f"No se pudo usar esta placa: flash de {mb or '¿?'} MB "
-                               "(el firmware necesita 4 u 8 MB).")
-        escribir(f"Placa con flash de {mb} MB: se instala el firmware para {carpeta}.")
-        fw = lambda n: recurso("firmware", carpeta, n)
+                               "(el firmware necesita al menos 4 MB).")
+        if mb > 4:
+            escribir(f"Placa con flash de {mb} MB: el firmware usa los primeros 4 MB.")
         if borrar_todo:
             esptool.main(base + ["erase-flash"])
+        else:
+            with open(fw("partitions.bin"), "rb") as f:
+                nueva = f.read()
+            ruta = os.path.join(tempfile.mkdtemp(prefix="monitor_th_"), "particiones_actuales.bin")
+            esptool.main(base + ["read-flash", "0x8000", hex(len(nueva)), ruta])
+            with open(ruta, "rb") as f:
+                actual = f.read()
+            os.remove(ruta)
+            en_blanco = all(b == 0xFF for b in actual)
+            # En 4 MB la división antigua (Zigbee ZCZR 4MB) ya tenía los datos en las mismas
+            # direcciones: solo cambia el tamaño del programa y no hay nada que borrar.
+            if not en_blanco and actual != nueva and mb > 4:
+                if not cambiar_division:
+                    raise CambioDeDivision()
+                escribir("Cambiando la división de la memoria: se borra el respaldo interno y la red Zigbee. "
+                         "La configuración, los nombres de los sensores, el WiFi y la clave de firma se conservan.")
+                inicio, largo = ZONA_DATOS_4MB
+                esptool.main(base + ["erase-region", hex(inicio), hex(largo)])
         esptool.main(base + ["--before", "default-reset", "--after", "hard-reset", "write-flash", "-z",
                              "--flash-mode", "keep", "--flash-freq", "keep", "--flash-size", "keep",
                              "0x0", fw("bootloader.bin"), "0x8000", fw("partitions.bin"),
@@ -1094,11 +1123,16 @@ class Aplicacion(tk.Tk):
         if borrar and not messagebox.askyesno(TITULO, "¿Seguro que quiere BORRAR TODO? Esto no se puede deshacer.",
                                               icon="warning"):
             return
+        self._instalar_firmware(puerto, borrar, False)
 
+    def _instalar_firmware(self, puerto: str, borrar: bool, cambiar_division: bool):
         def instalar():
             self.monitor.cerrar()
             self._escribir_fw(f"--- Instalando en {puerto} ---")
-            flashear(puerto, borrar, self._escribir_fw)
+            try:
+                flashear(puerto, borrar, self._escribir_fw, cambiar_division)
+            except CambioDeDivision:
+                return "cambio_de_division"
             self._escribir_fw("--- Firmware instalado. Esperando que el monitor arranque… ---")
             time.sleep(8)
             for _ in range(20):
@@ -1111,6 +1145,23 @@ class Aplicacion(tk.Tk):
             return None
 
         def listo(info):
+            if info == "cambio_de_division":
+                self._escribir_fw("--- No se instaló nada: la placa tiene la división de memoria antigua (8 MB). ---")
+                if messagebox.askyesno(
+                        TITULO,
+                        "Esta placa tiene la división de memoria antigua (de 8 MB). Desde el firmware 2.5 todos "
+                        "los monitores usan la misma división, la de 4 MB.\n\n"
+                        "Al cambiarla:\n"
+                        "• Se CONSERVAN el código del equipo, los nombres y correcciones de los sensores, el WiFi "
+                        "y la clave de firma.\n"
+                        "• Se BORRA la red Zigbee: hay que volver a emparejar cada sensor (Equipo → Abrir red "
+                        "para emparejar y mantener el botón del sensor ~5 s).\n"
+                        "• Se BORRA el respaldo interno: antes, confirme que las mediciones pendientes ya pasaron "
+                        "a la SD (la pantalla no debe decir \"pend. SD\").\n\n"
+                        "Se hace una sola vez por equipo. ¿Cambiar la división e instalar?",
+                        icon="warning"):
+                    self._instalar_firmware(puerto, borrar, True)
+                return
             self.btn_conectar.config(text="Desconectar" if self.monitor.abierto else "Conectar")
             if info:
                 self._escribir_fw(f"Monitor {info['codigo']} con firmware {info['firmware']}.")

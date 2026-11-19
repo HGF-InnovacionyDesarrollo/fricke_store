@@ -3,8 +3,9 @@ direcciones de código en su pila, para traducirlas con addr2line.
 
 Sirve para saber dónde se colgó el firmware cuando un ARRANQUE dice "watchdog".
 
-1. Leer la partición coredump de la placa (8 MB, Zigbee ZCZR):
-     esptool --port COM10 read_flash 0x7F0000 0x10000 coredump.bin
+1. Leer la partición coredump de la placa (división de partitions.csv, firmware 2.5 o posterior;
+   en placas con la división antigua de 8 MB estaba en 0x7F0000):
+     esptool --port COM10 read_flash 0x3F0000 0x10000 coredump.bin
 2. Usar el .elf de la MISMA versión de firmware que estaba corriendo:
      python leer_coredump.py coredump.bin Monitor_TH.ino.elf riscv32-esp-elf-addr2line.exe
    (addr2line está en Arduino15\\packages\\esp32\\tools\\esp-rv32\\<versión>\\bin)
