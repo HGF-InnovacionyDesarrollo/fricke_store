@@ -169,6 +169,12 @@ entonces:
   `SILENCIO_MIN` (30 min), igual que las otras alarmas, y deja de sonar sola al
   volver la luz. Sin el divisor instalado no hay detección, ni alerta ni sonido.
 - El comando `EQUIPO` muestra el voltaje en el pin y el estado.
+- Si se saca el divisor o el módulo UPS (por ejemplo, un equipo de escritorio conectado solo
+  al PC), la detección sigue activa y el pin en 0 V se lee como corte de luz: el comando
+  serie `ENERGIA OFF` (firmware 2.5) la apaga y borra la marca guardada (evento
+  `RESPALDO_ENERGIA`). Se vuelve a activar sola cuando el pin muestra otra vez el divisor.
+- Desde el firmware 2.5 la dirección del servidor se escribe sin la clave del equipo
+  (`http://****@host/...`) por el puerto serie y en el evento `WIFI_ENCENDIDO`.
 
 ## Micro SD y hora
 

@@ -37,7 +37,7 @@
 #include "logo_pantalla_240.h"  // LOGO_PANTALLA_240 (pantalla 2,4")
 #include "logo_marca.h"         // MARCA_*: ícono de F+data de 24 px, siempre en la cabecera
 
-#define VERSION_FIRMWARE "2.4"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
+#define VERSION_FIRMWARE "2.5"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
 #define LARGO_LINEA  200  // largo máximo de una fila de registro (incluida la firma)
 #define COLA_EVENTOS 24   // eventos en espera de escribirse
 
@@ -1031,6 +1031,19 @@ static void wifiApagar(const char *motivo) {
   }
 }
 
+// Copia la dirección del servidor sin la credencial: "http://equipo:clave@host/..." queda
+// "http://****@host/...". Es lo que se escribe por el puerto serie y en el registro de eventos
+// (que va a la SD y al portal): la clave del equipo nunca queda a la vista (firmware 2.5).
+static void servidorSinClave(const char *url, char *out, size_t len) {
+  const char *esquema = strstr(url, "://");
+  const char *arroba = strchr(url, '@');
+  if (!esquema || !arroba || arroba < esquema) {
+    strlcpy(out, url, len);
+    return;
+  }
+  snprintf(out, len, "%.*s****%s", (int)(esquema + 3 - url), url, arroba);
+}
+
 // Lee la configuración y enciende (o apaga) el WiFi. alArrancar: no lo enciende si el
 // reinicio anterior fue por una falla, para no quedar en un ciclo de reinicios.
 static void wifiAplicar(bool alArrancar) {
@@ -1070,9 +1083,11 @@ static void wifiAplicar(bool alArrancar) {
   esp_err_t e = esp_coex_wifi_i154_enable();
   wifiIniciado = true;
   wifiActivo = true;
+  char visible[sizeof(wifiServidor)];
+  servidorSinClave(servidor.c_str(), visible, sizeof(visible));
   Serial.printf("[WiFi] conectando a %s; servidor %s; memoria libre %lu; coexistencia %s\n", red.c_str(),
-                servidor.length() ? servidor.c_str() : "(ninguno)", (unsigned long)libre, esp_err_to_name(e));
-  registrarEvento("WIFI_ENCENDIDO", "red %s, servidor %s", red.c_str(), servidor.length() ? servidor.c_str() : "ninguno");
+                servidor.length() ? visible : "(ninguno)", (unsigned long)libre, esp_err_to_name(e));
+  registrarEvento("WIFI_ENCENDIDO", "red %s, servidor %s", red.c_str(), servidor.length() ? visible : "ninguno");
 }
 
 // Estado de la SD para el envío WiFi (firmware 2.2). Lo actualiza revisarAlertaSD() en el loop y lo lee la tarea
@@ -1296,6 +1311,18 @@ static void revisarComandoSerie() {
                       ANCHO, ALTO);
         Serial.printf("Energia: %lu mV en GPIO %d, deteccion %s, %s\n", (unsigned long)energiaMv, ENERGIA_PIN,
                       energiaArmada ? "activa" : "esperando el divisor", sinRed ? "SIN RED (bateria)" : "con red");
+      } else if (strcmp(linea, "ENERGIA OFF") == 0) {
+        // Apaga la detección de corte de luz (firmware 2.5): para un equipo sin divisor o al que se
+        // le sacó el módulo UPS (si no, con el pin en 0 V avisaría "SIN LUZ" para siempre). Se
+        // vuelve a activar sola cuando el pin muestra otra vez el voltaje del divisor.
+        energiaArmada = false;
+        prefs.putBool("energia", false);
+        if (sinRed) {
+          sinRed = false;
+          alarmaCambio = true;
+        }
+        registrarEvento("RESPALDO_ENERGIA", "deteccion de corte de luz desactivada por USB");
+        Serial.println("Deteccion de corte de luz desactivada (se activa sola al ver el divisor)");
       } else if (strcmp(linea, "LOGO") == 0) {
         logoAhora = true;
         Serial.println("Mostrando el logo");
