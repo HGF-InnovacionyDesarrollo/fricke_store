@@ -101,7 +101,7 @@ def resumen(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
         perfiles = _perfiles(c)
         filas = [dict(f) for f in c.execute("""
             SELECT s.id, s.nombre, s.ubicacion, s.perfil_id, s.equipo_id, e.codigo AS equipo,
-                   e.wifi_ultimo_envio, e.wifi_rssi,
+                   e.wifi_ultimo_envio, e.wifi_rssi, e.sd_ok, e.sd_fuera_desde, e.sd_pendientes,
                    l.fecha, l.temperatura, l.humedad, l.bateria, l.hora_lectura,
                    w.fecha AS w_fecha, w.temperatura AS w_temperatura, w.humedad AS w_humedad,
                    w.bateria AS w_bateria, w.recibido_en AS w_recibido
@@ -127,11 +127,14 @@ def resumen(ctx: ContextoModulo = Depends(acceso(CLAVE, VER))):
                              and f["fecha"] - f["hora_lectura"] > timedelta(minutes=SIN_DATOS_MIN))
         t, h = _f(f["temperatura"]), _f(f["humedad"])
         estado_t, estado_h = _estado_valor(t, p, "t"), _estado_valor(h, p, "h")
+        conectado = bool(f["wifi_ultimo_envio"] and datetime.now(timezone.utc) - f["wifi_ultimo_envio"]
+                         < timedelta(minutes=WIFI_SIN_ENVIO_MIN))
         equipo = equipos.setdefault(f["equipo"], {
             "codigo": f["equipo"], "sensores": [],
-            "wifi": {"ultimo_envio": f["wifi_ultimo_envio"], "rssi": f["wifi_rssi"],
-                     "conectado": bool(f["wifi_ultimo_envio"] and datetime.now(timezone.utc) - f["wifi_ultimo_envio"]
-                                       < timedelta(minutes=WIFI_SIN_ENVIO_MIN))} if f["wifi_ultimo_envio"] else None,
+            "wifi": {"ultimo_envio": f["wifi_ultimo_envio"], "rssi": f["wifi_rssi"], "conectado": conectado,
+                     # Solo con el envío al día: un estado viejo de la SD no sirve para avisar.
+                     "sd": {"ok": bool(f["sd_ok"]), "fuera_desde": f["sd_fuera_desde"], "pendientes": f["sd_pendientes"]}
+                     if conectado and f["sd_ok"] is not None else None} if f["wifi_ultimo_envio"] else None,
         })
         equipo["sensores"].append({
             "id": f["id"], "nombre": f["nombre"], "ubicacion": f["ubicacion"], "origen": origen,
@@ -470,6 +473,10 @@ class EnvioWifi(BaseModel):
     rssi: int | None = None
     envios_ok: int | None = None
     envios_falla: int | None = None
+    # Firmware 2.2: estado de la tarjeta SD (1 graba, 0 no), segundos sin grabar y filas esperando en la flash
+    sd: int | None = Field(default=None, ge=0, le=1)
+    sd_fuera_s: int | None = Field(default=None, ge=0)
+    pendientes: int | None = Field(default=None, ge=0)
     sensores: list[LecturaWifi] = Field(default_factory=list, max_length=32)
 
 
@@ -508,6 +515,10 @@ def _guardar_envio_wifi(d: EnvioWifi, eq: ContextoEquipo):
                   (d.serie.upper(), d.firmware, ahora_utc, d.rssi if d.rssi is not None and -120 <= d.rssi <= 0 else None,
                    max(0, d.envios_ok) if d.envios_ok is not None else None,
                    max(0, d.envios_falla) if d.envios_falla is not None else None, eid))
+        if d.sd is not None:
+            fuera = None if d.sd else ahora_utc - timedelta(seconds=min(d.sd_fuera_s or 0, 400 * 86400))
+            c.execute("UPDATE equipos SET sd_ok=?, sd_fuera_desde=?, sd_pendientes=? WHERE id=?",
+                      (d.sd, fuera.replace(microsecond=0) if fuera else None, d.pendientes, eid))
         for s in d.sensores:
             ieee = s.ieee.upper()
             fila = c.execute("SELECT id, equipo_id FROM sensores WHERE ieee=?", (ieee,)).fetchone()

@@ -122,11 +122,22 @@ const UNIDAD = { temperatura: "°C", humedad: "%" };
         modulo.puede(`${CLAVE}.importar`) ? { texto: "Importar archivos", alHacer: importarArchivos } : null);
     } else {
       html += equipos.map((e) => `<section class="grupo-equipo"><h2 class="titulo-seccion cab-equipo">Equipo ${esc(e.codigo)}${chipWifi(e.wifi)}</h2>
-        <div class="grilla-sensores">${e.sensores.map(tarjetaSensor).join("")}</div></section>`).join("");
+        ${avisoSD(e)}<div class="grilla-sensores">${e.sensores.map(tarjetaSensor).join("")}</div></section>`).join("");
       zona.innerHTML = html;
     }
     document.getElementById("ir-alarmas")?.addEventListener("click", () => ir("alarmas"));
     zona.querySelectorAll("[data-sensor]").forEach((b) => b.onclick = () => ir(`resumen/${b.dataset.sensor}`));
+  }
+
+  /** La tarjeta SD del equipo no está grabando (lo informa el envío WiFi, firmware 2.2): el registro oficial tendría un hueco. */
+  function avisoSD(e) {
+    const sd = e.wifi?.sd;
+    if (!sd || sd.ok) return "";
+    const desde = sd.fuera_desde ? ` desde el ${esc(fechaLocal(sd.fuera_desde))}` : "";
+    const n = sd.pendientes || 0;
+    const pend = n ? ` ${n.toLocaleString("es-CL")} ${n === 1 ? "medición espera" : "mediciones esperan"} en la memoria del equipo y pasarán a la SD cuando vuelva a grabar.` : "";
+    return `<p class="tarjeta aviso-sd" role="status">${linea("triangle-alert")}<span><b>La tarjeta SD de ${esc(e.codigo)} no está grabando${desde}.</b>
+      Revisa que esté puesta y bien insertada, o cámbiala.${pend} Las alarmas siguen llegando por WiFi.</span></p>`;
   }
 
   /** Estado del envío por WiFi de un equipo: con ícono y palabra, no solo color. */
