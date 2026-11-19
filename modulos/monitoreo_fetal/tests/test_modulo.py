@@ -1,7 +1,8 @@
-"""Pruebas propias del módulo F+mefi: lo que hace y quién puede hacerlo.
+"""Pruebas propias del módulo F+mefi (monitoreo_fetal): lo que hace y quién puede hacerlo.
 Correr con `pytest modulos/monitoreo_fetal`.
 Las reglas comunes (sesión, perfiles, ícono, diseño, Ley 21.719) ya las prueba tests/test_reglas_modulos.py.
 """
+import math
 import pytest
 
 from conftest import cliente, habilitar_modulo, nuevo_usuario
@@ -18,6 +19,40 @@ def personas():
         nuevo_usuario("funcionario", "Mat. Beto Clínico"),
         nuevo_usuario("dpd", "Carla Delegada"),
     )
+
+
+def test_analizar_trazado_serie_completa_mefi_v2(personas):
+    _, func, _ = personas
+    tc = cliente(func)
+    tiempos = [float(i * 2) for i in range(300)]  # 600s
+    fcf = [140.0 + 6.0 * math.sin(2.0 * math.pi * t / 20.0) for t in tiempos]
+    # Agregar una aceleración reactiva (+22 lpm por 30s)
+    for i, t in enumerate(tiempos):
+        if 120.0 <= t <= 150.0:
+            fcf[i] = 162.0
+    confiable = [True] * len(tiempos)
+    ua = [12.0 + (45.0 if 240.0 <= t <= 280.0 else 0.0) for t in tiempos]
+
+    r = tc.post(
+        f"{API}/analizar-trazado",
+        json={
+            "tiempos": tiempos,
+            "fcf": fcf,
+            "fcf_confiable": confiable,
+            "ua": ua,
+            "edad_gestacional_sem": 39,
+            "contexto_clinico": "Trabajo de parto fase activa",
+            "uso_oxitocina": "Sin oxitocina",
+            "meconio": "No (líquido claro / membranas íntegras)",
+        },
+    )
+    assert r.status_code == 200
+    res = r.json()
+    assert res["categoria_figo"] == "I"
+    assert res["linea_base_lpm"] == 140
+    assert res["variabilidad"]["categoria_nichd"] == "moderada"
+    assert len(res["aceleraciones"]) >= 1
+    assert "seccion_1" in res["informe"] and "seccion_4" in res["informe"]
 
 
 def test_casos_docentes_y_clasificacion_normativa(personas):

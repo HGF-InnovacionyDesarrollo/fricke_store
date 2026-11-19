@@ -1,7 +1,7 @@
 """API del módulo F+mefi, montada en /api/m/monitoreo_fetal/.
 Todo endpoint usa Depends(acceso(...)) y registra acciones en la bitácora sin datos personales en el detalle.
-Implementa el motor determinístico MEFI v2.0 (Protocolo V2 sept. 2025, ACOG CPG No. 10 2025, FIGO 2015 y NICE NG229)
-sobre escenarios docentes y simulaciones de capacitación sin datos de pacientes.
+Implementa el motor determinístico completo MEFI v2.0 (Protocolo V2 sept. 2025, ACOG CPG No. 10 2025, FIGO 2015 y NICE NG229)
+tanto sobre curvas digitalizadas FCF/UA (/analizar-trazado) como sobre escenarios docentes y simulaciones (/simulaciones).
 """
 from typing import Literal
 
@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from plataforma import ContextoModulo, acceso, bd_modulo, nombres_de
 
 from .manifiesto import CLAVE
+from .motor_mefi import analizar_trazado_completo
 
 router = APIRouter()
 DIAS_CONSERVACION = 365
@@ -44,6 +45,19 @@ class NuevaSimulacion(BaseModel):
     contracciones_10min: float = Field(default=3.0, ge=0.0, le=15.0)
     patron_sinusoidal: bool = False
     nota_docente: str = Field(default="", max_length=600)
+
+
+class SolicitudAnalisisTrazado(BaseModel):
+    tiempos: list[float] = Field(min_length=20, max_length=5000)
+    fcf: list[float] = Field(min_length=20, max_length=5000)
+    fcf_confiable: list[bool] = Field(min_length=20, max_length=5000)
+    ua: list[float] = Field(min_length=20, max_length=5000)
+    edad_gestacional_sem: int = Field(default=39, ge=24, le=43)
+    contexto_clinico: str = Field(default="Trabajo de parto fase activa", max_length=80)
+    uso_oxitocina: str = Field(default="No especificado", max_length=80)
+    meconio: str = Field(default="No especificado", max_length=80)
+    patologia_antenatal: str = Field(default="", max_length=120)
+    comparacion_mefi_previos: str = Field(default="", max_length=160)
 
 
 def evaluar_parametros_mefi(d: NuevaSimulacion) -> dict:
@@ -229,6 +243,35 @@ CASOS_DOCENTES = [
 ]
 
 
+@router.post("/analizar-trazado")
+def analizar_trazado(
+    d: SolicitudAnalisisTrazado,
+    ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.ver")),
+):
+    n = len(d.tiempos)
+    if not (len(d.fcf) == n and len(d.fcf_confiable) == n and len(d.ua) == n):
+        raise HTTPException(422, "Las series de tiempo FCF y UA deben tener la misma longitud.")
+    try:
+        resultado = analizar_trazado_completo(
+            tiempos=d.tiempos,
+            fcf=d.fcf,
+            fcf_confiable=d.fcf_confiable,
+            ua=d.ua,
+            metadatos={
+                "edad_gestacional_sem": d.edad_gestacional_sem,
+                "contexto_clinico": d.contexto_clinico,
+                "uso_oxitocina": d.uso_oxitocina,
+                "meconio": d.meconio,
+                "patologia_antenatal": d.patologia_antenatal,
+                "comparacion_mefi_previos": d.comparacion_mefi_previos,
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    ctx.auditar(f"{CLAVE}_trazado_analizado", f"trazado {n} muestras")
+    return resultado
+
+
 @router.get("/casos-docentes")
 def listar_casos_docentes(ctx: ContextoModulo = Depends(acceso(CLAVE, f"{CLAVE}.ver"))):
     salida = []
@@ -255,6 +298,7 @@ def listar_simulaciones(mias: bool = False, ctx: ContextoModulo = Depends(acceso
     for f in filas:
         f["variabilidad_lpm"] = float(f["variabilidad_lpm"])
         f["contracciones_10min"] = float(f["contracciones_10min"])
+        f["patron_sinusoidal"] = bool(f["patron_sinusoidal"])
         f["autor"] = autores.get(f["autor_id"], "—")
         f["puede_borrar"] = ctx.puede(f"{CLAVE}.moderar") or (
             f["autor_id"] == ctx.usuario_id and ctx.puede(f"{CLAVE}.simular")
@@ -289,7 +333,7 @@ def crear_simulacion(d: NuevaSimulacion, ctx: ContextoModulo = Depends(acceso(CL
                 tipo_dec,
                 dur_dec,
                 d.contracciones_10min,
-                d.patron_sinusoidal,
+                int(d.patron_sinusoidal),
                 ev["categoria_figo"],
                 ev["categoria_acog"],
                 ev["riesgo_cat_ii"],

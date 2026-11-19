@@ -1,6 +1,63 @@
 /* Estilos del módulo F+mefi. Solo variables de base.css; prohibido usar colores fijos (#hex o rgb/rgba). */
+.barra-etapas {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px;
+  max-width: 980px; margin: 0 0 16px;
+}
+.etapa-item {
+  padding: 10px 14px; border-radius: 12px; border: 1px solid var(--borde);
+  background: var(--tarjeta); color: var(--texto-3); font-size: 13px; line-height: 18px;
+}
+.etapa-item.activa {
+  background: var(--primario-suave); color: var(--primario); border-color: var(--primario); font-weight: 500;
+}
+.etapa-item.completada {
+  background: var(--acento-suave); color: var(--acento-texto); border-color: var(--acento);
+}
+.panel-analizador { max-width: 980px; display: grid; gap: 16px; }
+.fila-acciones-carga { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+.grilla-contexto { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 12px; margin-top: 12px; }
+.contenedor-canvas {
+  width: 100%; overflow: hidden; border-radius: 8px; border: 1px solid var(--borde);
+  background: var(--superficie); margin: 8px 0; touch-action: none;
+}
+.canvas-calibrador, .canvas-auditoria { width: 100%; height: auto; display: block; cursor: ns-resize; }
+.canvas-auditoria { cursor: default; }
+.fila-controles-cal {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;
+  align-items: start; margin-top: 8px;
+}
+.caja-linea-cal {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--borde); background: var(--superficie);
+}
+.caja-linea-cal h3 { font-size: 14px; line-height: 20px; font-weight: 500; margin: 0 0 8px; color: var(--texto); }
+.pildoras-escala { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.btn-pildora {
+  height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--borde);
+  background: var(--tarjeta); color: var(--texto-2); cursor: pointer; font-size: 13px; font-weight: 500;
+}
+.btn-pildora.activa {
+  background: var(--primario); color: var(--primario-texto); border-color: var(--primario);
+}
+.alerta-estado {
+  padding: 12px 16px; border-radius: 12px; border: 1px solid var(--borde);
+  background: var(--superficie); color: var(--texto); font-size: 14px; line-height: 20px;
+}
+.alerta-estado.ok { background: var(--acento-suave); color: var(--acento-texto); border-color: var(--acento); }
+.alerta-estado.error { border-color: var(--peligro); color: var(--peligro); }
+.grilla-normativa-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.grilla-kpis-6 { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+.kpi-card {
+  padding: 12px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta);
+}
+.kpi-card .kpi-label { font-size: 12px; line-height: 16px; color: var(--texto-3); display: block; }
+.kpi-card .kpi-val { font-size: 18px; line-height: 24px; font-weight: 500; color: var(--texto); margin: 4px 0; display: block; }
+.kpi-card .kpi-sub { font-size: 12px; line-height: 16px; color: var(--texto-2); display: block; }
+.tabla-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--borde); border-radius: 12px; }
+.tabla-decel { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+.tabla-decel th, .tabla-decel td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--borde-suave); }
+.tabla-decel th { background: var(--superficie); color: var(--texto-2); font-weight: 500; }
 .lista-simulaciones { display: grid; gap: 12px; max-width: 840px; }
-.grilla-casos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; max-width: 960px; margin-top: 16px; }
+.grilla-casos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; max-width: 980px; margin-top: 16px; }
 .simulacion h2, .caso-docente h2 { font-size: 16px; line-height: 24px; font-weight: 500; margin: 0 0 8px; color: var(--texto); }
 .simulacion p, .caso-docente p { margin: 0 0 12px; color: var(--texto-2); font-size: 14px; line-height: 20px; }
 .fila-cabecera-tarjeta { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -31,3 +88,5 @@
 .ficha dt { color: var(--texto-3); }
 .ficha dd { margin: 0; color: var(--texto-2); }
 .grilla-campos-dlg { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 12px; }
+.bloque-informe h3 { font-size: 15px; line-height: 22px; font-weight: 500; margin: 12px 0 4px; color: var(--texto); }
+.bloque-informe p { margin: 0 0 8px; color: var(--texto-2); font-size: 14px; line-height: 20px; }
