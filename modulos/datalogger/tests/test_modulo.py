@@ -235,6 +235,8 @@ def test_envio_wifi_tolera_valores_raros_de_un_sensor(personas):
     d["sensores"][0]["bat"] = 200
     d["sensores"][0]["edad_s"] = 12.0
     d["rssi"] = 5
+    d["sensores"][0]["ieee"] = "A4:C1:38:80:C7:47:95:98"  # así la manda el firmware (con ':')
+    d["sensores"][1]["ieee"] = "A4:C1:38:80:C7:47:95:99"
     r = TestClient(portal.app).post(f"{API}/equipo", json=d, auth=("equipo", secreto))
     assert r.status_code == 200 and r.json()["lecturas_nuevas"] == 1
     # Un formato realmente inválido sí se rechaza

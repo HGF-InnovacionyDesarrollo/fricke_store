@@ -10,13 +10,14 @@ import csv
 import io
 import logging
 import math
+import re
 import socket
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from plataforma import (ContextoEquipo, ContextoModulo, acceso, acceso_equipo, bd_modulo, crear_credencial_equipo,
                         credenciales_equipo, nombres_de, revocar_credencial_equipo)
@@ -444,6 +445,12 @@ class LecturaWifi(BaseModel):
     n: int = Field(ge=1, le=99)
     ieee: str = Field(pattern=r"^[0-9A-Fa-f]{16}$")
     nombre: str = Field(default="", max_length=40)
+
+    @field_validator("ieee", mode="before")
+    @classmethod
+    def _ieee_sin_separadores(cls, v):
+        """El firmware la manda como A4:C1:38:80:C7:47:95:01; el CSV de la SD la trae igual. Se guarda sin los ':'."""
+        return re.sub(r"[^0-9A-Fa-f]", "", v) if isinstance(v, str) else v
     # Sin límites aquí: un valor raro de un sensor no debe hacer rechazar todo el envío (se descarta más abajo).
     temp: float | None = None
     hum: float | None = None
