@@ -212,6 +212,11 @@ entonces:
   reactiva manteniendo otra vez el pulsador 3 s. Mientras la SD no se usa, la barra
   inferior lo avisa en amarillo. Si se saca sin avisar, se detecta en
   unos segundos y no se pierden filas.
+- Cabecera: el ícono de F+data siempre visible a la derecha (24 px, el mínimo de las
+  directrices de Fricke Store, con 6 px libres alrededor; firmware 2.3). La hora, la
+  fecha, la alarma y los avisos se acortan para no pasar bajo el ícono: en la alarma
+  se acorta el nombre del sensor, nunca el valor. El ícono se genera desde
+  `logo_f-data.png` con `python herramientas/generar_marca.py logo_marca.h`.
 - Barra inferior: cuenta regresiva del emparejamiento; si no, avisos técnicos en
   amarillo ("! Reloj sin hora", "! Sensor N sin datos", "! Sensor N bateria baja");
   si no hay, cantidad de sensores y filas pendientes de pasar a la SD.
@@ -323,10 +328,12 @@ El procedimiento está en `docs/Instructivo_calibracion_sensores_Monitor_TH.docx
 - Los sensores reportan cada cambio de ~0,5 °C o ~5 % (como máximo uno cada 5 min)
   y, sin cambios, al menos cada 30 min (`REPORTE_MAX_S`); la alarma puede tardar
   hasta 5 min en activarse.
-- Una alarma sigue activa hasta que llega una lectura dentro del rango, aunque el
-  sensor deje de reportar (y tras un reinicio): la vista de alarma muestra entonces
-  el último valor con "SIN DATOS", la hora del último dato y desde cuándo hay alarma.
-  Un sensor en alarma que se queda mudo no se da por resuelto.
+- Una alarma sigue activa hasta que llega una lectura dentro del rango. Si el sensor
+  deja de reportar más de `SIN_DATOS_MIN` (75 min; también tras un reinicio), la alarma
+  se cierra en silencio con su evento de fin ("sin datos hace mas de 75 min, alarma
+  cerrada") y el sensor queda como "! Sensor N sin datos" en la barra inferior, sin
+  sonido. Si vuelve a reportar fuera de rango, la alarma se abre de nuevo (firmware 2.3;
+  antes la alarma sonaba sin fin).
 - Cada alarma queda en el registro de eventos (`ALARMA_TEMP`, `ALARMA_TEMP_FIN`,
   `ALARMA_HUM`, `ALARMA_HUM_FIN`).
 
