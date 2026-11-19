@@ -163,6 +163,11 @@ entonces:
 
 - `CORTE_ENERGIA` / `ENERGIA_RESTABLECIDA` en los eventos (con la duración del corte).
 - Aviso "! Sin luz: bateria N min" en la barra y brillo bajo (`BRILLO_BATERIA`).
+- Desde el firmware 2.4, además, alerta "SIN LUZ" a pantalla completa (alterna con la
+  lista, como la de la SD, y tiene prioridad sobre ella; las alarmas de sensores van
+  primero) y el buzzer suena como una alarma. Se silencia con el pulsador por
+  `SILENCIO_MIN` (30 min), igual que las otras alarmas, y deja de sonar sola al
+  volver la luz. Sin el divisor instalado no hay detección, ni alerta ni sonido.
 - El comando `EQUIPO` muestra el voltaje en el pin y el estado.
 
 ## Micro SD y hora

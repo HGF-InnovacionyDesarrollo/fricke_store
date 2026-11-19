@@ -37,7 +37,7 @@
 #include "logo_pantalla_240.h"  // LOGO_PANTALLA_240 (pantalla 2,4")
 #include "logo_marca.h"         // MARCA_*: ícono de F+data de 24 px, siempre en la cabecera
 
-#define VERSION_FIRMWARE "2.3"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
+#define VERSION_FIRMWARE "2.4"  // subir al cambiar el comportamiento; queda en el evento ARRANQUE
 #define LARGO_LINEA  200  // largo máximo de una fila de registro (incluida la firma)
 #define COLA_EVENTOS 24   // eventos en espera de escribirse
 
@@ -2257,6 +2257,33 @@ static void dibujarVistaSD() {
   if (nivelBuzzer() == 1) textoCentro(ALTO - 20, "Pulsa para silenciar", 1, C_FONDO);
 }
 
+// Alerta de corte de luz a pantalla completa (firmware 2.4): el monitor quedó con la batería
+// del módulo UPS. Mismo diseño que la alerta de la SD; suena como alarma hasta silenciarla.
+static void dibujarVistaSinLuz() {
+  char buf[32];
+  bool vivo = (millis() / 1000) % 2 == 0;
+  gfx->fillScreen(C_AVISO);
+  gfx->fillRect(0, 0, ANCHO, 40, C_FONDO);
+  textoCentro(9, "SIN LUZ", 3, vivo ? C_AVISO : C_TEXTO);
+  textoCentro(56, "Funciona con", 2, C_FONDO);
+  textoCentro(76, "la batería", 2, C_FONDO);
+  textoCentro(104, "Revisa que el cargador", 1, C_FONDO);
+  textoCentro(116, "esté enchufado", 1, C_FONDO);
+  textoCentro(144, "Las mediciones y las", 1, C_FONDO);
+  textoCentro(156, "alarmas siguen activas", 1, C_FONDO);
+  gfx->drawFastHLine(10, 222, ANCHO - 20, C_FONDO);
+  uint32_t min = (millis() - sinRedDesdeMs) / 60000;
+  if (horaValida()) {
+    char hora[16];
+    horaCorta(time(nullptr) - (millis() - sinRedDesdeMs) / 1000, hora, sizeof(hora));
+    textoCentro(230, "sin luz desde", 1, C_FONDO);
+    textoCentro(242, hora, 2, C_FONDO);
+  }
+  snprintf(buf, sizeof(buf), "hace %lu min", (unsigned long)min);
+  textoCentro(264, buf, 1, C_FONDO);
+  if (nivelBuzzer() > 0) textoCentro(ALTO - 20, "Pulsa para silenciar", 1, C_FONDO);
+}
+
 // "14:50" si es de hoy, "28/09 14:50" si es de otro día.
 static void horaCorta(time_t t, char *out, size_t len) {
   time_t ahora = time(nullptr);
@@ -2392,7 +2419,7 @@ static void dibujar() {
   // o si alguien acaba de apretar un botón (quiere ver los sensores).
   bool emparejandoAhora = (int32_t)(emparejarHastaMs - millis()) > 0;
   bool usuarioMirando = (int32_t)(brilloAltoHastaMs - millis()) > 0;
-  if (logoActivo(enAlarma || aviso || emparejandoAhora || usuarioMirando || alertaSDActiva())) {
+  if (logoActivo(enAlarma || aviso || emparejandoAhora || usuarioMirando || alertaSDActiva() || sinRed)) {
     // El logo ocupa la pantalla completa: se copia directo al búfer del canvas.
     // El logo (16 bits, muchos colores) va directo al panel desde la flash, sin pasar por el canvas.
     panel->draw16bitRGBBitmap(0, 0, (uint16_t *)(ANCHO == 240 ? LOGO_PANTALLA_240 : LOGO_PANTALLA_170), ANCHO, ALTO);
@@ -2432,13 +2459,15 @@ static void dibujar() {
     }
   }
 
-  // Alerta técnica de la SD (solo si no hay alarmas de sensores).
-  if (!enAlarma && alertaSDActiva() && !usuarioMirando && !emparejandoAhora) {
+  // Corte de luz o alerta técnica de la SD (solo si no hay alarmas de sensores; la luz primero).
+  // Con batería el brillo queda bajo (BRILLO_BATERIA) para que dure más.
+  if (!enAlarma && (sinRed || alertaSDActiva()) && !usuarioMirando && !emparejandoAhora) {
     const uint32_t ciclo = (ALARMA_PANTALLA_S + ALARMA_LISTA_S) * 1000UL;
     if (millis() % ciclo < ALARMA_PANTALLA_S * 1000UL) {
-      dibujarVistaSD();
+      if (sinRed) dibujarVistaSinLuz();
+      else dibujarVistaSD();
       mostrarCanvas();
-      ajustarBrillo(true);
+      ajustarBrillo(!sinRed);
       return;
     }
   }
@@ -2598,6 +2627,8 @@ static void ajustarBrillo(bool hayAlarma) {
 
 // ---- Buzzer y silencio ----
 #define BIT_ALERTA_SD (1ULL << 63)   // alerta técnica de la SD (los sensores usan los bits bajos)
+#define BIT_SIN_LUZ   (1ULL << 62)   // corte de luz: suena como alarma (firmware 2.4)
+static_assert(2 * MAX_SENSORES <= 62, "los bits de los sensores chocan con el corte de luz y la SD");
 // Alarmas que hacen sonar el buzzer, como bits: 2*i temperatura, 2*i+1 humedad
 // del sensor i (según la configuración del equipo: buzzerTemp y buzzerHum).
 static uint64_t mascaraAlarmas() {
@@ -2610,6 +2641,7 @@ static uint64_t mascaraAlarmas() {
   }
   portEXIT_CRITICAL(&mux);
   if (alertaSDActiva()) m |= BIT_ALERTA_SD;
+  if (sinRed) m |= BIT_SIN_LUZ;
   return m;
 }
 
@@ -2617,7 +2649,7 @@ static bool silencioVigente() {
   return mascaraSilenciada && (int32_t)(silencioHastaMs - millis()) > 0;
 }
 
-// Qué debe sonar: 0 nada, 1 alerta técnica (SD), 2 alarma de un sensor. Una
+// Qué debe sonar: 0 nada, 1 alerta técnica (SD), 2 alarma de un sensor o corte de luz. Una
 // alarma que aparece después de silenciar vuelve a sonar.
 static int nivelBuzzer() {
 #if BUZZER_PIN >= 0
